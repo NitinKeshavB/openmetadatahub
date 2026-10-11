@@ -1,0 +1,11 @@
+# Access governance policy evaluated against Unity Catalog state.
+admin_principals: [data_platform_admins]
+role_principals:            # contract role -> Databricks group
+  sales_analysts: sales-analysts-grp
+  sales_etl: sales-etl-grp
+classification_rules:
+  - tag: sensitivity        # a Unity Catalog column tag
+    values: [pii, restricted]
+    mask_function: main.governance.mask_default
+    allowed_principals: [pii-readers]
+    deny_principals: [account users]

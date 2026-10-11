@@ -1,0 +1,64 @@
+# Declarative Automation Bundle (formerly Databricks Asset Bundles) for the openmetadatahub governance jobs.
+# Spark inside Databricks is the engine: jobs run the wheel on serverless compute, write results to Delta
+# tables in <results_catalog>.<results_schema>, and fail the task when a contract is violated.
+bundle:
+  name: openmetadatahub
+
+include:
+  - resources/*.yml
+
+artifacts:
+  omh_wheel:
+    type: whl
+    build: python -m build --wheel
+    path: .
+
+variables:
+  results_catalog:
+    description: Unity Catalog catalog that holds the governance result tables.
+  results_schema:
+    description: Schema for result tables (created if missing).
+    default: governance
+  contracts_path:
+    description: Folder of ODCS YAML files, e.g. /Volumes/main/governance/contracts
+  namespace:
+    description: catalog.schema used for contracts whose physicalName is not fully qualified.
+    default: ""
+  access_policy_path:
+    description: Optional access policy YAML (volume path).
+    default: ""
+  ai_manifests_path:
+    description: Optional folder of AI asset manifests (volume path).
+    default: ""
+  notify_email:
+    description: Address notified when a gate fails.
+  schedule_status:
+    description: PAUSED or UNPAUSED. Prod unpauses; keep PAUSED until the first manual run is green.
+    default: PAUSED
+  environment_version:
+    description: Serverless environment version for python_wheel_task.
+    default: "3"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://REPLACE-ME.cloud.databricks.com
+    variables:
+      results_catalog: dev_governance
+      contracts_path: /Volumes/dev_governance/governance/contracts
+      notify_email: you@example.com
+
+  prod:
+    mode: production
+    workspace:
+      host: https://REPLACE-ME.cloud.databricks.com
+      root_path: /Workspace/Shared/.bundles/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: REPLACE-WITH-SERVICE-PRINCIPAL-APPLICATION-ID
+    variables:
+      results_catalog: governance
+      contracts_path: /Volumes/governance/governance/contracts
+      notify_email: data-governance@example.com
+      schedule_status: UNPAUSED

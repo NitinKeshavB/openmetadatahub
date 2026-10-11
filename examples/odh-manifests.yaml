@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: serving.kserve.io/v1beta1
+    kind: InferenceService
+    metadata:
+      name: churn-model
+      namespace: ds-prod
+      annotations:
+        openmetadatahub.io/owner: ml-team
+        openmetadatahub.io/approved-by: cdo
+        openmetadatahub.io/risk-class: high
+        openmetadatahub.io/stage: production
+        openmetadatahub.io/intended-use: churn scoring for retention offers
+        openmetadatahub.io/limitations: not validated for business accounts
+        openmetadatahub.io/human-oversight: retention agent reviews every offer
+        openmetadatahub.io/data-sources: main.sales.orders, main.sales.customers
+    status:
+      url: https://churn.example/v1/models/churn
+  - apiVersion: serving.kserve.io/v1beta1
+    kind: InferenceService
+    metadata: {name: shadow-llm, namespace: ds-prod}
+  - apiVersion: trustyai.opendatahub.io/v1alpha1
+    kind: TrustyAIService
+    metadata: {name: trustyai-service, namespace: ds-prod}
+  - apiVersion: trustyai.opendatahub.io/v1alpha1
+    kind: LMEvalJob
+    metadata: {name: eval1, namespace: ds-prod}
+    spec:
+      model: churn-model
+      taskList: {taskNames: [arc_easy, truthfulqa]}

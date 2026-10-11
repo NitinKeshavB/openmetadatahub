@@ -1,0 +1,145 @@
+resources:
+  jobs:
+    # Nightly: check every active contract, audit access, then roll the evidence up into the AI gate.
+    omh_governance_daily:
+      name: omh-governance-daily
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      schedule:
+        quartz_cron_expression: "0 0 5 * * ?"
+        timezone_id: Australia/Sydney
+        pause_status: ${var.schedule_status}
+      email_notifications:
+        on_failure:
+          - ${var.notify_email}
+      parameters:
+        - { name: contracts_path, default: "${var.contracts_path}" }
+        - { name: results_catalog, default: "${var.results_catalog}" }
+        - { name: results_schema, default: "${var.results_schema}" }
+        - { name: namespace, default: "${var.namespace}" }
+        - { name: access_policy, default: "${var.access_policy_path}" }
+        - { name: ai_manifests, default: "${var.ai_manifests_path}" }
+        - { name: enforcement, default: gate }
+      environments:
+        - environment_key: omh
+          spec:
+            environment_version: "${var.environment_version}"
+            dependencies:
+              - ${workspace.artifact_path}/.internal/*.whl
+      tasks:
+        - task_key: enforce_contracts
+          environment_key: omh
+          python_wheel_task:
+            package_name: openmetadatahub
+            entry_point: omh-enforce-contracts
+            parameters:
+              - "--contracts-path={{job.parameters.contracts_path}}"
+              - "--results-catalog={{job.parameters.results_catalog}}"
+              - "--results-schema={{job.parameters.results_schema}}"
+              - "--namespace={{job.parameters.namespace}}"
+              - "--enforcement={{job.parameters.enforcement}}"
+              - "--access-policy={{job.parameters.access_policy}}"
+              - "--ai-manifests={{job.parameters.ai_manifests}}"
+              - "--run-id={{job.run_id}}"
+        - task_key: audit_access
+          environment_key: omh
+          python_wheel_task:
+            package_name: openmetadatahub
+            entry_point: omh-audit-access
+            parameters:
+              - "--contracts-path={{job.parameters.contracts_path}}"
+              - "--results-catalog={{job.parameters.results_catalog}}"
+              - "--results-schema={{job.parameters.results_schema}}"
+              - "--namespace={{job.parameters.namespace}}"
+              - "--enforcement={{job.parameters.enforcement}}"
+              - "--access-policy={{job.parameters.access_policy}}"
+              - "--ai-manifests={{job.parameters.ai_manifests}}"
+              - "--run-id={{job.run_id}}"
+        # Runs even if an upstream gate failed: a blocked source must show up as a blocked AI asset, not a skipped one.
+        - task_key: assess_ai
+          environment_key: omh
+          depends_on:
+            - task_key: enforce_contracts
+            - task_key: audit_access
+          run_if: ALL_DONE
+          python_wheel_task:
+            package_name: openmetadatahub
+            entry_point: omh-assess-ai
+            parameters:
+              - "--contracts-path={{job.parameters.contracts_path}}"
+              - "--results-catalog={{job.parameters.results_catalog}}"
+              - "--results-schema={{job.parameters.results_schema}}"
+              - "--namespace={{job.parameters.namespace}}"
+              - "--enforcement={{job.parameters.enforcement}}"
+              - "--access-policy={{job.parameters.access_policy}}"
+              - "--ai-manifests={{job.parameters.ai_manifests}}"
+              - "--run-id={{job.run_id}}"
+
+    # Reusable gate: call from a pipeline job with run_job_task so a violated contract stops downstream tasks.
+    omh_contract_gate:
+      name: omh-contract-gate
+      max_concurrent_runs: 5
+      email_notifications:
+        on_failure:
+          - ${var.notify_email}
+      parameters:
+        - { name: contract_ids, default: "" }
+        - { name: contracts_path, default: "${var.contracts_path}" }
+        - { name: results_catalog, default: "${var.results_catalog}" }
+        - { name: results_schema, default: "${var.results_schema}" }
+        - { name: namespace, default: "${var.namespace}" }
+      environments:
+        - environment_key: omh
+          spec:
+            environment_version: "${var.environment_version}"
+            dependencies:
+              - ${workspace.artifact_path}/.internal/*.whl
+      tasks:
+        - task_key: enforce_contracts
+          environment_key: omh
+          python_wheel_task:
+            package_name: openmetadatahub
+            entry_point: omh-enforce-contracts
+            parameters:
+              - "--contracts-path={{job.parameters.contracts_path}}"
+              - "--results-catalog={{job.parameters.results_catalog}}"
+              - "--results-schema={{job.parameters.results_schema}}"
+              - "--namespace={{job.parameters.namespace}}"
+              - "--contract-ids={{job.parameters.contract_ids}}"
+              - "--enforcement=gate"
+              - "--run-id={{job.run_id}}"
+
+    # Example: re-check a contract whenever its table is updated. Edit the table name, then unpause.
+    omh_orders_on_update:
+      name: omh-orders-on-update
+      max_concurrent_runs: 1
+      trigger:
+        pause_status: PAUSED
+        table_update:
+          table_names:
+            - ${var.results_catalog}.sales.orders
+          condition: ANY_UPDATED
+          min_time_between_triggers_seconds: 300
+      email_notifications:
+        on_failure:
+          - ${var.notify_email}
+      environments:
+        - environment_key: omh
+          spec:
+            environment_version: "${var.environment_version}"
+            dependencies:
+              - ${workspace.artifact_path}/.internal/*.whl
+      tasks:
+        - task_key: enforce_contracts
+          environment_key: omh
+          python_wheel_task:
+            package_name: openmetadatahub
+            entry_point: omh-enforce-contracts
+            parameters:
+              - "--contracts-path=${var.contracts_path}"
+              - "--results-catalog=${var.results_catalog}"
+              - "--results-schema=${var.results_schema}"
+              - "--namespace=${var.namespace}"
+              - "--contract-ids=orders-contract"
+              - "--enforcement=gate"

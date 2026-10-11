@@ -1,0 +1,53 @@
+apiVersion: v3.1.0
+kind: DataContract
+id: orders-contract
+name: Orders
+version: 1.0.0
+status: active
+domain: sales
+schema:
+  - name: orders
+    physicalName: main.sales.orders
+    properties:
+      - name: order_id
+        logicalType: integer
+        primaryKey: true
+        required: true
+      - name: email
+        logicalType: string
+        classification: pii
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments: {pattern: "^[^@]+@[^@]+$"}
+            mustBe: 0
+            unit: rows
+      - name: status
+        logicalType: string
+        required: true
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments: {validValues: [NEW, PAID, SHIPPED]}
+            mustBeLessThan: 1
+            unit: percent
+            severity: warning
+      - name: updated_at
+        logicalType: timestamp
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+      - type: sql
+        query: SELECT COUNT(*) FROM main.sales.orders WHERE amount < 0
+        mustBe: 0
+slaProperties:
+  - property: freshness
+    value: 24
+    unit: h
+    element: orders.updated_at
+roles:
+  - role: sales_analysts
+    access: read
+  - role: sales_etl
+    access: write
