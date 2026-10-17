@@ -1,6 +1,9 @@
 """openmetadatahub: governance, data quality, data contracts and AI governance for Databricks."""
 
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import (
+    PackageNotFoundError,
+    version,
+)
 
 try:
     __version__ = version("openmetadatahub")  # version.txt is the single source, read by setuptools at build time

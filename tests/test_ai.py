@@ -1,10 +1,22 @@
+from conftest import CONTRACT_V1
+
 from openmetadatahub.access import Finding
-from openmetadatahub.ai import (AIAsset, AIPolicy, AssetKind, CheckStatus, Comparator, EvaluationThreshold, Evidence,
-                                RiskClass, Stage, assess, control_coverage, discover_odh)
+from openmetadatahub.ai import (
+    AIAsset,
+    AIPolicy,
+    AssetKind,
+    CheckStatus,
+    Comparator,
+    EvaluationThreshold,
+    Evidence,
+    RiskClass,
+    Stage,
+    assess,
+    control_coverage,
+    discover_odh,
+)
 from openmetadatahub.common import Severity
 from openmetadatahub.contracts import load_contract
-
-from conftest import CONTRACT_V1
 
 MANIFESTS = """
 apiVersion: v1
@@ -69,7 +81,9 @@ def _healthy_evidence():
 
 
 def test_well_governed_asset_is_not_blocked():
-    churn = {a.name: a for a in discover_odh(MANIFESTS)}["churn-model"].model_copy(update={"evaluations": {"bias_score": 0.05}})
+    churn = {a.name: a for a in discover_odh(MANIFESTS)}["churn-model"].model_copy(
+        update={"evaluations": {"bias_score": 0.05}}
+    )
     policy = AIPolicy(thresholds=[EvaluationThreshold(metric="bias_score", comparator=Comparator.LTE, value=0.1)])
     result = assess(churn, policy, _healthy_evidence())
     assert not result.blocked, [c for c in result.checks if c.status == CheckStatus.FAIL]
@@ -104,17 +118,25 @@ def test_access_findings_on_source_tables_block_the_asset():
 
 def test_missing_evaluation_result_fails_rather_than_passes():
     a = AIAsset(id="a", name="a", kind=AssetKind.MODEL, owner="o")
-    policy = AIPolicy(thresholds=[EvaluationThreshold(metric="hallucination_rate", comparator=Comparator.LTE, value=0.05)])
+    policy = AIPolicy(
+        thresholds=[EvaluationThreshold(metric="hallucination_rate", comparator=Comparator.LTE, value=0.05)]
+    )
     check = next(c for c in assess(a, policy).checks if c.code == "eval:hallucination_rate")
     assert check.status == CheckStatus.FAIL and "no evaluation result" in check.message
 
 
 def test_threshold_directions():
-    a = AIAsset(id="a", name="a", kind=AssetKind.MODEL, owner="o", evaluations={"accuracy": 0.8, "pii_leakage_rate": 0.02})
-    policy = AIPolicy(thresholds=[
-        EvaluationThreshold(metric="accuracy", comparator=Comparator.GTE, value=0.9),
-        EvaluationThreshold(metric="pii_leakage_rate", comparator=Comparator.LTE, value=0.01, severity=Severity.CRITICAL),
-    ])
+    a = AIAsset(
+        id="a", name="a", kind=AssetKind.MODEL, owner="o", evaluations={"accuracy": 0.8, "pii_leakage_rate": 0.02}
+    )
+    policy = AIPolicy(
+        thresholds=[
+            EvaluationThreshold(metric="accuracy", comparator=Comparator.GTE, value=0.9),
+            EvaluationThreshold(
+                metric="pii_leakage_rate", comparator=Comparator.LTE, value=0.01, severity=Severity.CRITICAL
+            ),
+        ]
+    )
     by = {c.code: c for c in assess(a, policy).checks}
     assert by["eval:accuracy"].status == CheckStatus.FAIL
     assert by["eval:pii_leakage_rate"].severity == Severity.CRITICAL
@@ -126,10 +148,20 @@ def test_unacceptable_risk_is_always_blocked_even_if_policy_scopes_it_out():
 
 
 def test_control_coverage_never_treats_manual_or_missing_evidence_as_pass():
-    a = AIAsset(id="a", name="a", kind=AssetKind.MODEL, owner="o", risk_class=RiskClass.HIGH, stage=Stage.STAGING,
-                intended_use="u", limitations="l", human_oversight="h", monitoring_enabled=True)
+    a = AIAsset(
+        id="a",
+        name="a",
+        kind=AssetKind.MODEL,
+        owner="o",
+        risk_class=RiskClass.HIGH,
+        stage=Stage.STAGING,
+        intended_use="u",
+        limitations="l",
+        human_oversight="h",
+        monitoring_enabled=True,
+    )
     cov = control_coverage(assess(a, AIPolicy()))
-    assert cov["EUAIA-10"]["status"] == "manual"        # no data sources declared
+    assert cov["EUAIA-10"]["status"] == "manual"  # no data sources declared
     assert cov["EUAIA-14"]["status"] == "pass"
     assert cov["EUAIA-12"]["status"] == "pass"
     assert cov["EUAIA-5"]["status"] == "no_evidence"

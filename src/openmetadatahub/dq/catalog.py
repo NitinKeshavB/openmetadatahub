@@ -11,10 +11,21 @@ validated up front so a bad contract fails before any query runs.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import (
+    Any,
+    Callable,
+)
 
-from ..common import quote_fqn, quote_ident, sql_literal
-from .models import Dimension, Scope, TestCase
+from ..common import (
+    quote_fqn,
+    quote_ident,
+    sql_literal,
+)
+from .models import (
+    Dimension,
+    Scope,
+    TestCase,
+)
 
 
 class MetricError(ValueError):
@@ -73,6 +84,7 @@ def _need(case: TestCase, *keys: str) -> None:
 
 
 # ---------- column, row-wise ----------
+
 
 def _not_null(case: TestCase) -> str:
     return _rowwise(case, f"{_col(case)} IS NULL")
@@ -141,6 +153,7 @@ def _fk_exists(case: TestCase) -> str:
 
 # ---------- scalar ----------
 
+
 def _row_count(case: TestCase) -> str:
     return f"SELECT COUNT(*) AS observed FROM {quote_fqn(case.table)}{_where(case)}"
 
@@ -188,13 +201,25 @@ def _custom_scalar(case: TestCase) -> str:
 
 _SCALAR_BOUNDS = {
     "row_count": ("Table row count within bounds", Dimension.VOLUME, Scope.TABLE, _row_count, ()),
-    "freshness_hours": ("Newest value of a timestamp column is recent enough", Dimension.TIMELINESS, Scope.COLUMN, _freshness, ("max_age_hours",)),
+    "freshness_hours": (
+        "Newest value of a timestamp column is recent enough",
+        Dimension.TIMELINESS,
+        Scope.COLUMN,
+        _freshness,
+        ("max_age_hours",),
+    ),
     "column_count": ("Table column count within bounds", Dimension.CONSISTENCY, Scope.TABLE, _column_count, ()),
     "null_pct": ("Share of nulls in a column within bounds", Dimension.COMPLETENESS, Scope.COLUMN, _null_pct, ()),
     "column_min": ("Column minimum within bounds", Dimension.ACCURACY, Scope.COLUMN, _stat("MIN"), ()),
     "column_max": ("Column maximum within bounds", Dimension.ACCURACY, Scope.COLUMN, _stat("MAX"), ()),
     "column_mean": ("Column mean within bounds", Dimension.ACCURACY, Scope.COLUMN, _stat("AVG"), ()),
-    "column_stddev": ("Column standard deviation within bounds", Dimension.ACCURACY, Scope.COLUMN, _stat("STDDEV"), ()),
+    "column_stddev": (
+        "Column standard deviation within bounds",
+        Dimension.ACCURACY,
+        Scope.COLUMN,
+        _stat("STDDEV"),
+        (),
+    ),
     "column_sum": ("Column sum within bounds", Dimension.ACCURACY, Scope.COLUMN, _stat("SUM"), ()),
     "custom_sql": ("Single-value SELECT within bounds", Dimension.CUSTOM, Scope.TABLE, _custom_scalar, ("sql",)),
 }
@@ -204,10 +229,22 @@ _ROWWISE = {
     "column_unique": ("No duplicate non-null values", Dimension.UNIQUENESS, Scope.COLUMN, _unique, ()),
     "column_in_set": ("Values restricted to a set", Dimension.VALIDITY, Scope.COLUMN, _in_set, ("values",)),
     "column_not_in_set": ("Values avoid a forbidden set", Dimension.VALIDITY, Scope.COLUMN, _not_in_set, ("values",)),
-    "column_matches_regex": ("Values match a regular expression", Dimension.VALIDITY, Scope.COLUMN, _regex, ("pattern",)),
+    "column_matches_regex": (
+        "Values match a regular expression",
+        Dimension.VALIDITY,
+        Scope.COLUMN,
+        _regex,
+        ("pattern",),
+    ),
     "column_between": ("Values inside a range", Dimension.ACCURACY, Scope.COLUMN, _between, ()),
     "column_length_between": ("String length inside a range", Dimension.VALIDITY, Scope.COLUMN, _length_between, ()),
-    "column_fk_exists": ("Values exist in a reference table", Dimension.INTEGRITY, Scope.COLUMN, _fk_exists, ("ref_table", "ref_column")),
+    "column_fk_exists": (
+        "Values exist in a reference table",
+        Dimension.INTEGRITY,
+        Scope.COLUMN,
+        _fk_exists,
+        ("ref_table", "ref_column"),
+    ),
 }
 
 METRICS: dict[str, Metric] = {}
@@ -226,7 +263,13 @@ def get_metric(name: str) -> Metric:
 
 def describe_catalog() -> list[dict[str, Any]]:
     return [
-        {"name": m.name, "dimension": m.dimension.value, "scope": m.scope.value, "kind": m.kind,
-         "description": m.description, "required_params": list(m.required)}
+        {
+            "name": m.name,
+            "dimension": m.dimension.value,
+            "scope": m.scope.value,
+            "kind": m.kind,
+            "description": m.description,
+            "required_params": list(m.required),
+        }
         for m in sorted(METRICS.values(), key=lambda m: (m.dimension.value, m.name))
     ]

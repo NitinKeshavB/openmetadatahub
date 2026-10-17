@@ -64,8 +64,9 @@ def test_the_bundle_matches_the_databricks_cli_schema():
         pytest.skip("databricks CLI not installed")
     jsonschema = pytest.importorskip("jsonschema")
     env = {k: v for k, v in os.environ.items() if not k.startswith("DATABRICKS_")}
-    schema = json.loads(subprocess.run(["databricks", "bundle", "schema"], capture_output=True, text=True,
-                                       check=True, env=env).stdout)
+    schema = json.loads(
+        subprocess.run(["databricks", "bundle", "schema"], capture_output=True, text=True, check=True, env=env).stdout
+    )
     text = re.sub(r"\[\\\\p\{L\}\\\\p\{N\}\]", "[A-Za-z0-9]", json.dumps(schema)).replace("\\\\p{L}", "[A-Za-z]")
     errors = list(jsonschema.Draft7Validator(json.loads(text)).iter_errors(BUNDLE))
     assert not errors, [f"{'/'.join(map(str, e.absolute_path))}: {e.message[:160]}" for e in errors]

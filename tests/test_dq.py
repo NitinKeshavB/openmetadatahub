@@ -1,8 +1,19 @@
 import pytest
 import sqlglot
 
-from openmetadatahub.common import Severity, quote_fqn
-from openmetadatahub.dq import METRICS, MetricError, Status, TestCase, run_case, run_cases, summarise
+from openmetadatahub.common import (
+    Severity,
+    quote_fqn,
+)
+from openmetadatahub.dq import (
+    METRICS,
+    MetricError,
+    Status,
+    TestCase,
+    run_case,
+    run_cases,
+    summarise,
+)
 
 
 def _case(metric, column="email", **params):
@@ -10,12 +21,23 @@ def _case(metric, column="email", **params):
 
 
 SAMPLE_PARAMS = {
-    "row_count": {"min": 1}, "freshness_hours": {"max_age_hours": 24}, "column_count": {"min": 1},
-    "null_pct": {"max": 5}, "column_min": {"min": 0}, "column_max": {"max": 9}, "column_mean": {"min": 0},
-    "column_stddev": {"max": 9}, "column_sum": {"min": 0}, "custom_sql": {"sql": "SELECT 1"},
-    "column_not_null": {}, "column_unique": {}, "column_in_set": {"values": ["a", "b"]},
-    "column_not_in_set": {"values": ["x"]}, "column_matches_regex": {"pattern": "^a"},
-    "column_between": {"min": 0, "max": 5}, "column_length_between": {"min": 1, "max": 5},
+    "row_count": {"min": 1},
+    "freshness_hours": {"max_age_hours": 24},
+    "column_count": {"min": 1},
+    "null_pct": {"max": 5},
+    "column_min": {"min": 0},
+    "column_max": {"max": 9},
+    "column_mean": {"min": 0},
+    "column_stddev": {"max": 9},
+    "column_sum": {"min": 0},
+    "custom_sql": {"sql": "SELECT 1"},
+    "column_not_null": {},
+    "column_unique": {},
+    "column_in_set": {"values": ["a", "b"]},
+    "column_not_in_set": {"values": ["x"]},
+    "column_matches_regex": {"pattern": "^a"},
+    "column_between": {"min": 0, "max": 5},
+    "column_length_between": {"min": 1, "max": 5},
     "column_fk_exists": {"ref_table": "main.ref.dim", "ref_column": "id"},
 }
 

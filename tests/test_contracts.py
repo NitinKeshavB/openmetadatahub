@@ -1,9 +1,13 @@
 import pytest
+from conftest import CONTRACT_V1
 
 from openmetadatahub.common import Severity
-from openmetadatahub.contracts import contract_to_tests, diff_contracts, load_contract, validate_schema
-
-from conftest import CONTRACT_V1
+from openmetadatahub.contracts import (
+    contract_to_tests,
+    diff_contracts,
+    load_contract,
+    validate_schema,
+)
 
 
 def test_contract_compiles_to_expected_tests():
@@ -47,12 +51,15 @@ def _cols(*rows):
 
 
 def test_schema_validation_reports_each_kind_of_drift(fake):
-    fake.when("information_schema.columns", _cols(
-        ("order_id", "BIGINT", "NO"),
-        ("email", "INT", "YES"),          # wrong type
-        ("status", "STRING", "YES"),      # required but nullable
-        ("amount", "DECIMAL", "YES"),     # undeclared
-    ))                                    # updated_at missing
+    fake.when(
+        "information_schema.columns",
+        _cols(
+            ("order_id", "BIGINT", "NO"),
+            ("email", "INT", "YES"),  # wrong type
+            ("status", "STRING", "YES"),  # required but nullable
+            ("amount", "DECIMAL", "YES"),  # undeclared
+        ),
+    )  # updated_at missing
     issues = {(i.column, i.code): i for i in validate_schema(load_contract(CONTRACT_V1), fake)}
     assert ("updated_at", "column-missing") in issues
     assert issues[("updated_at", "column-missing")].severity == Severity.CRITICAL
@@ -78,17 +85,30 @@ def test_breaking_change_requires_major_bump():
     d = diff_contracts(old, new)
     assert any(c.code == "column-removed" and c.path == "orders.updated_at" for c in d.changes)
     assert d.required_bump == "major" and d.declared_bump == "minor" and not d.version_ok
-    assert diff_contracts(old, _bump("2.0.0", lambda t: t.replace("      - name: updated_at\n        logicalType: timestamp\n", ""))).version_ok
+    assert diff_contracts(
+        old, _bump("2.0.0", lambda t: t.replace("      - name: updated_at\n        logicalType: timestamp\n", ""))
+    ).version_ok
 
 
 def test_additive_and_relaxing_changes():
     old = _bump("1.0.0")
-    added = _bump("1.1.0", lambda t: t.replace("      - name: updated_at\n", "      - name: region\n        logicalType: string\n      - name: updated_at\n"))
+    added = _bump(
+        "1.1.0",
+        lambda t: t.replace(
+            "      - name: updated_at\n",
+            "      - name: region\n        logicalType: string\n      - name: updated_at\n",
+        ),
+    )
     d = diff_contracts(old, added)
     assert d.required_bump == "minor" and d.version_ok and d.changes[0].kind == "additive"
 
-    relaxed = _bump("1.0.1", lambda t: t.replace("      - name: status\n        logicalType: string\n        required: true",
-                                                 "      - name: status\n        logicalType: string"))
+    relaxed = _bump(
+        "1.0.1",
+        lambda t: t.replace(
+            "      - name: status\n        logicalType: string\n        required: true",
+            "      - name: status\n        logicalType: string",
+        ),
+    )
     d = diff_contracts(old, relaxed)
     assert any(c.code == "required-relaxed" and c.kind == "breaking" for c in d.changes)
     assert not d.version_ok

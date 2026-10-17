@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import (
+    BaseModel,
+    Field,
+)
 
 from ..common import Severity
 
@@ -49,10 +52,13 @@ class AIAsset(BaseModel):
     intended_use: str | None = None
     limitations: str | None = None
     endpoint: str | None = None
-    data_sources: list[str] = Field(default_factory=list, description="catalog.schema.table feeding training/RAG/features")
+    data_sources: list[str] = Field(
+        default_factory=list, description="catalog.schema.table feeding training/RAG/features"
+    )
     data_contracts: list[str] = Field(default_factory=list, description="contract ids covering those sources")
-    evaluations: dict[str, float] = Field(default_factory=dict,
-                                          description="e.g. bias_score, hallucination_rate, pii_leakage_rate, accuracy")
+    evaluations: dict[str, float] = Field(
+        default_factory=dict, description="e.g. bias_score, hallucination_rate, pii_leakage_rate, accuracy"
+    )
     monitoring_enabled: bool = False
     guardrails_enabled: bool = False
     human_oversight: str | None = Field(default=None, description="How a human can intervene or override")
@@ -76,7 +82,9 @@ class AIPolicy(BaseModel):
     """Organisation policy applied to AI assets. Everything is optional; unset means not enforced."""
 
     name: str = "default"
-    applies_to_risk: list[RiskClass] = Field(default_factory=lambda: [RiskClass.HIGH, RiskClass.LIMITED, RiskClass.MINIMAL])
+    applies_to_risk: list[RiskClass] = Field(
+        default_factory=lambda: [RiskClass.HIGH, RiskClass.LIMITED, RiskClass.MINIMAL]
+    )
     require_owner: bool = True
     require_approval_for_stages: list[Stage] = Field(default_factory=lambda: [Stage.PRODUCTION])
     require_risk_class_for_stages: list[Stage] = Field(default_factory=lambda: [Stage.STAGING, Stage.PRODUCTION])

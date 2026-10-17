@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ..common import Severity, SqlExecutor, quote_ident, sql_literal
+from ..common import (
+    Severity,
+    SqlExecutor,
+    quote_ident,
+    sql_literal,
+)
 from .odcs import DataContract
 
 _TYPE_FAMILY = {
@@ -47,32 +52,74 @@ def validate_schema(contract: DataContract, executor: SqlExecutor, namespace: st
         table = contract.qualified_table(obj, namespace)
         actual = {r["column_name"].lower(): r for r in fetch_columns(executor, table)}
         if not actual:
-            issues.append(SchemaIssue(table=table, column=None, code="table-missing", severity=Severity.CRITICAL,
-                                      message="table not found or no columns visible to this principal"))
+            issues.append(
+                SchemaIssue(
+                    table=table,
+                    column=None,
+                    code="table-missing",
+                    severity=Severity.CRITICAL,
+                    message="table not found or no columns visible to this principal",
+                )
+            )
             continue
         declared = {p.name.lower() for p in obj.properties}
         for prop in obj.properties:
             row = actual.get(prop.name.lower())
             if row is None:
-                issues.append(SchemaIssue(table=table, column=prop.name, code="column-missing", severity=Severity.CRITICAL,
-                                          message="declared in contract but absent from the table"))
+                issues.append(
+                    SchemaIssue(
+                        table=table,
+                        column=prop.name,
+                        code="column-missing",
+                        severity=Severity.CRITICAL,
+                        message="declared in contract but absent from the table",
+                    )
+                )
                 continue
             got = _base_type(str(row["data_type"]))
             if prop.physicalType:
                 want = _base_type(prop.physicalType)
                 if want != got:
-                    issues.append(SchemaIssue(table=table, column=prop.name, code="type-mismatch", severity=Severity.ERROR,
-                                              message=f"physicalType {want} declared, table has {got}"))
+                    issues.append(
+                        SchemaIssue(
+                            table=table,
+                            column=prop.name,
+                            code="type-mismatch",
+                            severity=Severity.ERROR,
+                            message=f"physicalType {want} declared, table has {got}",
+                        )
+                    )
             elif prop.logicalType and prop.logicalType.lower() in _TYPE_FAMILY:
                 if got not in _TYPE_FAMILY[prop.logicalType.lower()]:
-                    issues.append(SchemaIssue(table=table, column=prop.name, code="type-mismatch", severity=Severity.ERROR,
-                                              message=f"logicalType {prop.logicalType} expects one of "
-                                                      f"{sorted(_TYPE_FAMILY[prop.logicalType.lower()])}, table has {got}"))
+                    issues.append(
+                        SchemaIssue(
+                            table=table,
+                            column=prop.name,
+                            code="type-mismatch",
+                            severity=Severity.ERROR,
+                            message=f"logicalType {prop.logicalType} expects one of "
+                            f"{sorted(_TYPE_FAMILY[prop.logicalType.lower()])}, table has {got}",
+                        )
+                    )
             if (prop.required or prop.primaryKey) and str(row.get("is_nullable", "YES")).upper() == "YES":
-                issues.append(SchemaIssue(table=table, column=prop.name, code="nullable-but-required", severity=Severity.WARNING,
-                                          message="contract requires a value but the column has no NOT NULL constraint; "
-                                                  "the not-null data quality test is the only enforcement"))
+                issues.append(
+                    SchemaIssue(
+                        table=table,
+                        column=prop.name,
+                        code="nullable-but-required",
+                        severity=Severity.WARNING,
+                        message="contract requires a value but the column has no NOT NULL constraint; "
+                        "the not-null data quality test is the only enforcement",
+                    )
+                )
         for name in sorted(set(actual) - declared):
-            issues.append(SchemaIssue(table=table, column=name, code="undeclared-column", severity=Severity.INFO,
-                                      message="present in the table but not declared in the contract"))
+            issues.append(
+                SchemaIssue(
+                    table=table,
+                    column=name,
+                    code="undeclared-column",
+                    severity=Severity.INFO,
+                    message="present in the table but not declared in the contract",
+                )
+            )
     return issues

@@ -5,12 +5,24 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from typing import Any, Callable
+from typing import (
+    Any,
+    Callable,
+)
 
 from ..common import Severity
-from ..runlog import RunEventBuffer, configure_run_logging, logger
+from ..runlog import (
+    RunEventBuffer,
+    configure_run_logging,
+    logger,
+)
 from .config import JobConfig
-from .runner import Outcome, assess_ai, audit_access, enforce_contracts
+from .runner import (
+    Outcome,
+    assess_ai,
+    audit_access,
+    enforce_contracts,
+)
 from .spark import get_spark
 from .store import ResultStore
 
@@ -21,8 +33,12 @@ def _csv(v: str | None) -> tuple[str, ...]:
 
 def _parser(prog: str) -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog=prog)
-    p.add_argument("--contracts-path", required=True, help="folder (or file) of ODCS YAML, e.g. a Unity Catalog volume")
-    p.add_argument("--results-catalog", default="", help="catalog for result tables; empty = hive_metastore-style schema.table")
+    p.add_argument(
+        "--contracts-path", required=True, help="folder (or file) of ODCS YAML, e.g. a Unity Catalog volume"
+    )
+    p.add_argument(
+        "--results-catalog", default="", help="catalog for result tables; empty = hive_metastore-style schema.table"
+    )
     p.add_argument("--results-schema", default="governance")
     p.add_argument("--namespace", default="", help="catalog.schema for unqualified physicalNames")
     p.add_argument("--enforcement", default="gate", choices=["gate", "report"])
@@ -39,11 +55,18 @@ def _parser(prog: str) -> argparse.ArgumentParser:
 
 def _config(a: argparse.Namespace) -> JobConfig:
     kw = dict(
-        contracts_path=a.contracts_path, results_catalog=a.results_catalog or None, results_schema=a.results_schema,
-        namespace=a.namespace or None, enforcement=a.enforcement, gate_severity=Severity(a.gate_severity),
-        enforced_statuses=_csv(a.enforced_statuses) or ("active",), contract_ids=_csv(a.contract_ids),
-        access_policy_path=a.access_policy or None, ai_manifests_path=a.ai_manifests or None,
-        ai_policy_path=a.ai_policy or None, max_evidence_age_hours=a.max_evidence_age_hours,
+        contracts_path=a.contracts_path,
+        results_catalog=a.results_catalog or None,
+        results_schema=a.results_schema,
+        namespace=a.namespace or None,
+        enforcement=a.enforcement,
+        gate_severity=Severity(a.gate_severity),
+        enforced_statuses=_csv(a.enforced_statuses) or ("active",),
+        contract_ids=_csv(a.contract_ids),
+        access_policy_path=a.access_policy or None,
+        ai_manifests_path=a.ai_manifests or None,
+        ai_policy_path=a.ai_policy or None,
+        max_evidence_age_hours=a.max_evidence_age_hours,
     )
     if a.run_id:
         kw["run_id"] = a.run_id
@@ -58,8 +81,14 @@ def _report(what: str, out: Outcome) -> None:
 
 def _store_events(spark: Any, cfg: JobConfig, events: RunEventBuffer) -> None:
     rows = [
-        dict(run_id=e.run_id, seq=e.seq, level=e.level, message=e.message[:4000], logged_at=e.logged_at,
-             context=json.dumps(dict(e.context), default=str)[:4000])
+        dict(
+            run_id=e.run_id,
+            seq=e.seq,
+            level=e.level,
+            message=e.message[:4000],
+            logged_at=e.logged_at,
+            context=json.dumps(dict(e.context), default=str)[:4000],
+        )
         for e in events.events
     ]
     store = ResultStore(spark, cfg.results_catalog, cfg.results_schema)
@@ -72,8 +101,14 @@ def _run(job: str, what: str, argv: list[str] | None, action: Callable[[Any, Job
 
     Events are stored even when the job raises (a closed gate fails the task last, after everything is recorded)."""
     cfg = _config(_parser(job).parse_args(argv))
-    events = configure_run_logging({"run_id": cfg.run_id, "job": job, "target": os.environ.get("BUNDLE_TARGET", ""),
-                                    "git_sha": os.environ.get("GIT_COMMIT", "")})
+    events = configure_run_logging(
+        {
+            "run_id": cfg.run_id,
+            "job": job,
+            "target": os.environ.get("BUNDLE_TARGET", ""),
+            "git_sha": os.environ.get("GIT_COMMIT", ""),
+        }
+    )
     spark = get_spark()
     try:
         out = action(spark, cfg)

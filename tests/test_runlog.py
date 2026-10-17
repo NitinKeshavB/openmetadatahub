@@ -4,14 +4,24 @@ import io
 import json
 from datetime import datetime
 
-from openmetadatahub.runlog import REDACTED, RunEventBuffer, configure_run_logging, logger, redact_mapping, redact_text
+from openmetadatahub.runlog import (
+    REDACTED,
+    RunEventBuffer,
+    configure_run_logging,
+    logger,
+    redact_mapping,
+    redact_text,
+)
 
 
 def test_tokens_and_secret_values_are_masked():
     text = "token dapi" + "0" * 32 + "-2 and Bearer abcdefghijklmnop and password=hunter2"
     assert redact_text(text) == f"token {REDACTED} and Bearer {REDACTED} and password={REDACTED}"
     assert redact_mapping({"client_secret": "x", "note": "api_key: k", "rows": 3}) == {
-        "client_secret": REDACTED, "note": f"api_key: {REDACTED}", "rows": 3}
+        "client_secret": REDACTED,
+        "note": f"api_key: {REDACTED}",
+        "rows": 3,
+    }
 
 
 def test_every_line_is_json_with_the_run_context_and_is_buffered():

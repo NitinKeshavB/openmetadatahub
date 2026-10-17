@@ -13,8 +13,10 @@ from openmetadatahub.jobs.spark import SparkSqlExecutor
 CAT = "spark_catalog"
 
 INFO_TABLES = {
-    "row_filters": "schema_name string, table_name string, filter_catalog string, filter_schema string, filter_name string, filter_col_usage string",
-    "column_masks": "schema_name string, table_name string, column_name string, mask_catalog string, mask_schema string, mask_name string, mask_col_usage string",
+    "row_filters": "schema_name string, table_name string, filter_catalog string, filter_schema string, filter_name "
+    "string, filter_col_usage string",
+    "column_masks": "schema_name string, table_name string, column_name string, mask_catalog string, mask_schema "
+    "string, mask_name string, mask_col_usage string",
     "table_tags": "schema_name string, table_name string, tag_name string, tag_value string",
     "column_tags": "schema_name string, table_name string, column_name string, tag_name string, tag_value string",
 }
@@ -50,8 +52,11 @@ def refresh_information_schema(spark) -> None:
                 continue
             for i, c in enumerate(spark.catalog.listColumns(f"{db.name}.{t.name}")):
                 rows.append((db.name, t.name, c.name, c.dataType, "YES" if c.nullable else "NO", i))
-    spark.createDataFrame(rows, "table_schema string, table_name string, column_name string, data_type string, "
-                                "is_nullable string, ordinal_position int").write.mode("overwrite").saveAsTable("information_schema.columns")
+    spark.createDataFrame(
+        rows,
+        "table_schema string, table_name string, column_name string, data_type string, "
+        "is_nullable string, ordinal_position int",
+    ).write.mode("overwrite").saveAsTable("information_schema.columns")
     for name, ddl in INFO_TABLES.items():
         if not spark.catalog.tableExists(f"information_schema.{name}"):
             set_rows(spark, name, [])
@@ -59,4 +64,6 @@ def refresh_information_schema(spark) -> None:
 
 def set_rows(spark, info_table: str, rows: list[tuple]) -> None:
     """Replace the contents of information_schema.<table> (parquet tables do not support DELETE)."""
-    spark.createDataFrame(rows, INFO_TABLES[info_table]).write.mode("overwrite").saveAsTable(f"information_schema.{info_table}")
+    spark.createDataFrame(rows, INFO_TABLES[info_table]).write.mode("overwrite").saveAsTable(
+        f"information_schema.{info_table}"
+    )

@@ -2,15 +2,43 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import (
+    FastAPI,
+    HTTPException,
+)
+from pydantic import (
+    BaseModel,
+    Field,
+)
 
 from . import __version__
-from .access import AccessPolicy, evaluate, snapshot_table
-from .ai import AIAsset, AIPolicy, Evidence, assess, control_coverage, discover_odh
+from .access import (
+    AccessPolicy,
+    evaluate,
+    snapshot_table,
+)
+from .ai import (
+    AIAsset,
+    AIPolicy,
+    Evidence,
+    assess,
+    control_coverage,
+    discover_odh,
+)
 from .common import SqlExecutor
-from .contracts import contract_to_tests, diff_contracts, load_contract, validate_schema
-from .dq import MetricError, TestCase, describe_catalog, run_cases, summarise
+from .contracts import (
+    contract_to_tests,
+    diff_contracts,
+    load_contract,
+    validate_schema,
+)
+from .dq import (
+    MetricError,
+    TestCase,
+    describe_catalog,
+    run_cases,
+    summarise,
+)
 
 
 class _NoWarehouse:

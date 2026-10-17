@@ -14,8 +14,14 @@ from __future__ import annotations
 
 import re
 import sys
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import (
+    dataclass,
+    field,
+)
+from datetime import (
+    datetime,
+    timezone,
+)
 from typing import (
     Any,
     Mapping,
@@ -23,7 +29,6 @@ from typing import (
 )
 
 from loguru import logger
-
 
 REDACTED = "***"
 _SECRET_KEY = re.compile(r"(secret|token|password|passwd|credential|api_key|apikey)", re.IGNORECASE)

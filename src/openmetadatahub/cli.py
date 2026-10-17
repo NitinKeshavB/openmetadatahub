@@ -8,7 +8,11 @@ import sys
 from pathlib import Path
 
 from .ai import discover_odh
-from .contracts import contract_to_tests, diff_contracts, load_contract
+from .contracts import (
+    contract_to_tests,
+    diff_contracts,
+    load_contract,
+)
 from .dq import describe_catalog
 
 
