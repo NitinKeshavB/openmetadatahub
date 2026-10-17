@@ -149,12 +149,17 @@ def test_entry_point_runs_the_same_job_from_cli_arguments(env, capsys):
     args = ["--contracts-path", str(env.folder), "--results-catalog", CAT, "--results-schema", env.cfg().results_schema,
             "--run-id", "job-run-42", "--contract-ids", "orders-contract"]
     enforce_contracts_main(args)
-    assert "[contracts] pass     orders-contract" in capsys.readouterr().out
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])["record"]
+    assert line["message"] == "[contracts] pass orders-contract" and line["extra"]["run_id"] == "job-run-42"
     assert env.table("contract_runs").collect()[0].run_id == "job-run-42"
+    events = env.table("run_events").orderBy("seq").collect()
+    assert [(e.run_id, e.level, e.message) for e in events] == [("job-run-42", "INFO", "[contracts] pass orders-contract")]
 
     make_orders(env.spark, healthy=False)
     with pytest.raises(EnforcementFailed):
         enforce_contracts_main(args)
+    failed = env.table("run_events").where("level = 'ERROR'").collect()
+    assert len(failed) == 1 and "omh-enforce-contracts failed" in failed[0].message  # recorded even though it raised
 
 
 # ------------------------------------------------------------------ access

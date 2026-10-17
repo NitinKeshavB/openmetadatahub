@@ -1,0 +1,43 @@
+# Continuous delivery. A merge to main deploys to dev, then test. A version tag (v*) promotes through uat, preprod
+# and prod; each of those GitHub environments has required reviewers. The same commit is deployed everywhere.
+name: CD
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  dev:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: dev
+
+  test:
+    needs: dev
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: test
+
+  uat:
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: uat
+
+  preprod:
+    needs: uat
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: preprod
+
+  prod:
+    needs: preprod
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: prod

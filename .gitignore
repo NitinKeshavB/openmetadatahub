@@ -2,3 +2,10 @@
 __pycache__/
 *.egg-info/
 .pytest_cache/
+test-reports/
+build/
+dist/
+.coverage
+htmlcov/
+spark-warehouse/
+metastore_db/

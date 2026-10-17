@@ -2,7 +2,7 @@ resources:
   jobs:
     # Nightly: check every active contract, audit access, then roll the evidence up into the AI gate.
     omh_governance_daily:
-      name: omh-governance-daily
+      name: '[${var.project_id}] ${var.workload} governance daily (${bundle.target})'
       max_concurrent_runs: 1
       queue:
         enabled: true
@@ -10,9 +10,25 @@ resources:
         quartz_cron_expression: "0 0 5 * * ?"
         timezone_id: Australia/Sydney
         pause_status: ${var.schedule_status}
+      budget_policy_id: ${var.budget_policy_id}
+      tags:
+        project_id: ${var.project_id}
+        workload: ${var.workload}
+        bundle: ${bundle.name}
+        target: ${bundle.target}
+        git_repo: ${bundle.git.origin_url}
+        git_ref: ${bundle.git.branch}
+        git_sha: ${bundle.git.commit}
+        cost_center: ${var.cost_center}
+        region: ${var.region}
       email_notifications:
         on_failure:
           - ${var.notify_email}
+      webhook_notifications:
+        on_failure:
+          - id: ${var.notification_destination_id}
+        on_duration_warning_threshold_exceeded:
+          - id: ${var.notification_destination_id}
       parameters:
         - { name: contracts_path, default: "${var.contracts_path}" }
         - { name: results_catalog, default: "${var.results_catalog}" }
@@ -78,11 +94,27 @@ resources:
 
     # Reusable gate: call from a pipeline job with run_job_task so a violated contract stops downstream tasks.
     omh_contract_gate:
-      name: omh-contract-gate
+      name: '[${var.project_id}] ${var.workload} contract gate (${bundle.target})'
       max_concurrent_runs: 5
+      budget_policy_id: ${var.budget_policy_id}
+      tags:
+        project_id: ${var.project_id}
+        workload: ${var.workload}
+        bundle: ${bundle.name}
+        target: ${bundle.target}
+        git_repo: ${bundle.git.origin_url}
+        git_ref: ${bundle.git.branch}
+        git_sha: ${bundle.git.commit}
+        cost_center: ${var.cost_center}
+        region: ${var.region}
       email_notifications:
         on_failure:
           - ${var.notify_email}
+      webhook_notifications:
+        on_failure:
+          - id: ${var.notification_destination_id}
+        on_duration_warning_threshold_exceeded:
+          - id: ${var.notification_destination_id}
       parameters:
         - { name: contract_ids, default: "" }
         - { name: contracts_path, default: "${var.contracts_path}" }
@@ -112,7 +144,7 @@ resources:
 
     # Example: re-check a contract whenever its table is updated. Edit the table name, then unpause.
     omh_orders_on_update:
-      name: omh-orders-on-update
+      name: '[${var.project_id}] ${var.workload} orders on update (${bundle.target})'
       max_concurrent_runs: 1
       trigger:
         pause_status: PAUSED
@@ -121,9 +153,25 @@ resources:
             - ${var.results_catalog}.sales.orders
           condition: ANY_UPDATED
           min_time_between_triggers_seconds: 300
+      budget_policy_id: ${var.budget_policy_id}
+      tags:
+        project_id: ${var.project_id}
+        workload: ${var.workload}
+        bundle: ${bundle.name}
+        target: ${bundle.target}
+        git_repo: ${bundle.git.origin_url}
+        git_ref: ${bundle.git.branch}
+        git_sha: ${bundle.git.commit}
+        cost_center: ${var.cost_center}
+        region: ${var.region}
       email_notifications:
         on_failure:
           - ${var.notify_email}
+      webhook_notifications:
+        on_failure:
+          - id: ${var.notification_destination_id}
+        on_duration_warning_threshold_exceeded:
+          - id: ${var.notification_destination_id}
       environments:
         - environment_key: omh
           spec:

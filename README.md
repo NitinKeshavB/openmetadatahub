@@ -52,7 +52,23 @@ The AI gate ties it together: pass each asset's table scores and access findings
 
 The checks run as Databricks Jobs on serverless compute. Each task is a wheel entry point (`omh-enforce-contracts`, `omh-audit-access`, `omh-assess-ai`) that uses the job's own Spark session, so every generated query executes inside Databricks and no token or SQL warehouse is needed. Results are appended to Delta tables in `<results_catalog>.<results_schema>` (`contract_runs`, `dq_results`, `quality_scores`, `schema_issues`, `contract_versions`, `access_audits`, `access_findings`, `ai_assessments`). Enforcement is "record first, fail last": every contract is checked and written, then the task fails if any active contract is violated. Details and deployment steps: [docs/JOBS.md](docs/JOBS.md).
 
-`databricks.yml` and `resources/jobs.yml` define three jobs: `omh_governance_daily` (scheduled; contracts and access in parallel, then the AI gate), `omh_contract_gate` (call it from a pipeline with `run_job_task` to stop downstream tasks) and `omh_orders_on_update` (example table-update trigger, paused).
+`databricks.yml` (targets `dev`, `test`, `uat`, `preprod`, `prod`) and `resources/jobs.yml` define three jobs, each tagged with its project, repository and commit, attached to a budget policy, and notifying by email and Microsoft Teams on failure: `omh_governance_daily` (scheduled; contracts and access in parallel, then the AI gate), `omh_contract_gate` (call it from a pipeline with `run_job_task` to stop downstream tasks) and `omh_orders_on_update` (example table-update trigger, paused).
+
+## Development process
+
+The same process as repositories generated from [cookiecutter-dbxops](https://github.com/NitinKeshavB/cookiecutter-dbxops):
+
+```bash
+make install            # editable install with test, lint and release tools
+make lint               # pre-commit: black, isort, flake8, secrets, no commits to main
+make test               # pytest with a 90% coverage gate
+make check-placeholders # values still to fill in; STRICT=1 (used by every deploy) fails while any remain
+```
+
+CI (`.github/workflows/ci.yml`) runs lint and tests on every pull request. CD deploys `main` to dev and test, and a `v*`
+tag to uat, preprod and prod behind GitHub environment reviewers, authenticating with GitHub OIDC. `version.txt` is the
+only version. Jobs log JSON through `openmetadatahub.runlog` (loguru) and keep their events in the `run_events` table.
+`CLAUDE.md` and `.claude/agents/code-reviewer.md` hold the rules for AI-assisted changes.
 
 ## Safety properties
 

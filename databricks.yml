@@ -1,6 +1,11 @@
 # Declarative Automation Bundle (formerly Databricks Asset Bundles) for the openmetadatahub governance jobs.
 # Spark inside Databricks is the engine: jobs run the wheel on serverless compute, write results to Delta
 # tables in <results_catalog>.<results_schema>, and fail the task when a contract is violated.
+#
+# Same delivery process as repositories generated from cookiecutter-dbxops: five targets (dev, test, uat, preprod,
+# prod), non-dev targets run as the service principal, every value containing PLACEHOLDER blocks deployment
+# (`make check-placeholders`), and every job carries project, repository and commit tags, a budget policy and
+# Teams/email notifications. Merge to main deploys dev and test; a v* tag deploys uat, preprod and prod.
 bundle:
   name: openmetadatahub
 
@@ -14,6 +19,12 @@ artifacts:
     path: .
 
 variables:
+  project_id:
+    description: Project id used in tags and cost attribution.
+    default: openmetadatahub
+  workload:
+    description: de, ml, ai or platform; these are platform governance jobs.
+    default: platform
   results_catalog:
     description: Unity Catalog catalog that holds the governance result tables.
   results_schema:
@@ -31,7 +42,17 @@ variables:
     description: Optional folder of AI asset manifests (volume path).
     default: ""
   notify_email:
-    description: Address notified when a gate fails.
+    description: Address (or distribution list) notified when a gate fails.
+  notification_destination_id:
+    description: Workspace notification destination (Microsoft Teams) for failures and duration warnings.
+  budget_policy_id:
+    description: Serverless budget policy; its tags attribute serverless cost to this project.
+  cost_center:
+    description: Cost centre tag.
+  region:
+    description: Region tag.
+  service_principal_application_id:
+    description: Application id the non-dev targets run as.
   schedule_status:
     description: PAUSED or UNPAUSED. Prod unpauses; keep PAUSED until the first manual run is green.
     default: PAUSED
@@ -44,21 +65,81 @@ targets:
     mode: development
     default: true
     workspace:
-      host: https://REPLACE-ME.cloud.databricks.com
+      host: https://PLACEHOLDER-workspace-host.azuredatabricks.net
     variables:
-      results_catalog: dev_governance
-      contracts_path: /Volumes/dev_governance/governance/contracts
-      notify_email: you@example.com
+      results_catalog: PLACEHOLDER-dev-catalog
+      contracts_path: /Volumes/PLACEHOLDER-dev-catalog/governance/contracts
+      notify_email: PLACEHOLDER-notification-email
+      notification_destination_id: PLACEHOLDER-teams-notification-destination-id
+      budget_policy_id: PLACEHOLDER-budget-policy-id
+      cost_center: PLACEHOLDER-cost-center
+      region: PLACEHOLDER-region
+
+  test:
+    mode: production
+    workspace:
+      host: https://PLACEHOLDER-workspace-host.azuredatabricks.net
+      root_path: /Workspace/Shared/.bundles/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.service_principal_application_id}
+    variables:
+      results_catalog: PLACEHOLDER-test-catalog
+      contracts_path: /Volumes/PLACEHOLDER-test-catalog/governance/contracts
+      notify_email: PLACEHOLDER-notification-email
+      notification_destination_id: PLACEHOLDER-teams-notification-destination-id
+      budget_policy_id: PLACEHOLDER-budget-policy-id
+      cost_center: PLACEHOLDER-cost-center
+      region: PLACEHOLDER-region
+      service_principal_application_id: PLACEHOLDER-service-principal-application-id
+
+  uat:
+    mode: production
+    workspace:
+      host: https://PLACEHOLDER-workspace-host.azuredatabricks.net
+      root_path: /Workspace/Shared/.bundles/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.service_principal_application_id}
+    variables:
+      results_catalog: PLACEHOLDER-uat-catalog
+      contracts_path: /Volumes/PLACEHOLDER-uat-catalog/governance/contracts
+      notify_email: PLACEHOLDER-notification-email
+      notification_destination_id: PLACEHOLDER-teams-notification-destination-id
+      budget_policy_id: PLACEHOLDER-budget-policy-id
+      cost_center: PLACEHOLDER-cost-center
+      region: PLACEHOLDER-region
+      service_principal_application_id: PLACEHOLDER-service-principal-application-id
+
+  preprod:
+    mode: production
+    workspace:
+      host: https://PLACEHOLDER-workspace-host.azuredatabricks.net
+      root_path: /Workspace/Shared/.bundles/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.service_principal_application_id}
+    variables:
+      results_catalog: PLACEHOLDER-preprod-catalog
+      contracts_path: /Volumes/PLACEHOLDER-preprod-catalog/governance/contracts
+      notify_email: PLACEHOLDER-notification-email
+      notification_destination_id: PLACEHOLDER-teams-notification-destination-id
+      budget_policy_id: PLACEHOLDER-budget-policy-id
+      cost_center: PLACEHOLDER-cost-center
+      region: PLACEHOLDER-region
+      service_principal_application_id: PLACEHOLDER-service-principal-application-id
 
   prod:
     mode: production
     workspace:
-      host: https://REPLACE-ME.cloud.databricks.com
+      host: https://PLACEHOLDER-workspace-host.azuredatabricks.net
       root_path: /Workspace/Shared/.bundles/${bundle.name}/${bundle.target}
     run_as:
-      service_principal_name: REPLACE-WITH-SERVICE-PRINCIPAL-APPLICATION-ID
+      service_principal_name: ${var.service_principal_application_id}
     variables:
-      results_catalog: governance
-      contracts_path: /Volumes/governance/governance/contracts
-      notify_email: data-governance@example.com
+      results_catalog: PLACEHOLDER-prod-catalog
+      contracts_path: /Volumes/PLACEHOLDER-prod-catalog/governance/contracts
+      notify_email: PLACEHOLDER-notification-email
+      notification_destination_id: PLACEHOLDER-teams-notification-destination-id
+      budget_policy_id: PLACEHOLDER-budget-policy-id
+      cost_center: PLACEHOLDER-cost-center
+      region: PLACEHOLDER-region
+      service_principal_application_id: PLACEHOLDER-service-principal-application-id
       schedule_status: UNPAUSED

@@ -46,6 +46,9 @@ TABLES: dict[str, str] = {
         "run_id STRING, run_ts TIMESTAMP, asset_id STRING, asset_name STRING, stage STRING, risk_class STRING, "
         "blocked BOOLEAN, checks STRING, control_coverage STRING"
     ),
+    "run_events": (
+        "run_id STRING, seq INT, level STRING, message STRING, logged_at TIMESTAMP, context STRING"
+    ),
 }
 
 
