@@ -35,10 +35,15 @@ def spark(tmp_path_factory):
     from pyspark.sql import SparkSession
 
     wh = tmp_path_factory.mktemp("warehouse")
-    s = (SparkSession.builder.master("local[2]").appName("omh-tests")
-         .config("spark.sql.warehouse.dir", str(wh)).config("spark.ui.enabled", "false")
-         .config("spark.sql.shuffle.partitions", "2").config("spark.driver.bindAddress", "127.0.0.1")
-         .getOrCreate())
+    s = (
+        SparkSession.builder.master("local[2]")
+        .appName("omh-tests")
+        .config("spark.sql.warehouse.dir", str(wh))
+        .config("spark.ui.enabled", "false")
+        .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.driver.bindAddress", "127.0.0.1")
+        .getOrCreate()
+    )
     s.sparkContext.setLogLevel("ERROR")
     yield s
     s.stop()

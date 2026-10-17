@@ -1,0 +1,44 @@
+# Deploy the bundle to one target. Called by cd.yml.
+#
+# Authentication is Databricks workload identity federation for GitHub Actions (DATABRICKS_AUTH_TYPE=github-oidc):
+# the GitHub environment for the target carries the variable DEPLOY_SP_CLIENT_ID, the application id of a service
+# principal that has a federation policy for this repository. No secret is stored.
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: dev, test, uat, preprod or prod
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      DATABRICKS_AUTH_TYPE: github-oidc
+      DATABRICKS_CLIENT_ID: ${{ vars.DEPLOY_SP_CLIENT_ID }}
+      TARGET: ${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: databricks/setup-cli@v1.20.0
+      - run: python -m pip install build
+      - name: Refuse to deploy while placeholders remain
+        run: make check-placeholders STRICT=1
+      - name: Validate and deploy (no --auto-approve, so a destructive change stops for a human)
+        run: |
+          databricks bundle validate -t "$TARGET"
+          databricks bundle deploy -t "$TARGET"

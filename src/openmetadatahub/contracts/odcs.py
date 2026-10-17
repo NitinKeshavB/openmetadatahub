@@ -10,7 +10,11 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+)
 
 
 class _Base(BaseModel):
@@ -99,7 +103,8 @@ class DataContract(_Base):
         if len(parts) == 1 and namespace and len(namespace.split(".")) == 2:
             return f"{namespace}.{phys}"
         raise ValueError(
-            f"cannot resolve {phys!r} to catalog.schema.table; pass namespace='catalog.schema' or use a qualified physicalName"
+            f"cannot resolve {phys!r} to catalog.schema.table; pass namespace='catalog.schema' or use a qualified "
+            "physicalName"
         )
 
 

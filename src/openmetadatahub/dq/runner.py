@@ -4,9 +4,21 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ..common import Severity, SqlExecutor
-from .catalog import MetricError, get_metric
-from .models import Dimension, QualityReport, Status, TestCase, TestResult
+from ..common import (
+    Severity,
+    SqlExecutor,
+)
+from .catalog import (
+    MetricError,
+    get_metric,
+)
+from .models import (
+    Dimension,
+    QualityReport,
+    Status,
+    TestCase,
+    TestResult,
+)
 
 SEVERITY_WEIGHT = {Severity.INFO: 1, Severity.WARNING: 2, Severity.ERROR: 4, Severity.CRITICAL: 8}
 
@@ -41,11 +53,13 @@ def run_case(case: TestCase, executor: SqlExecutor) -> TestResult:
     try:
         rows = executor.query(sql)
     except Exception as exc:  # warehouse boundary: surface, do not crash the whole run
-        return TestResult(case=case, dimension=metric.dimension, status=Status.ABORTED, sql=sql,
-                          message=f"query failed: {exc}")
+        return TestResult(
+            case=case, dimension=metric.dimension, status=Status.ABORTED, sql=sql, message=f"query failed: {exc}"
+        )
     if not rows:
-        return TestResult(case=case, dimension=metric.dimension, status=Status.ABORTED, sql=sql,
-                          message="query returned no rows")
+        return TestResult(
+            case=case, dimension=metric.dimension, status=Status.ABORTED, sql=sql, message="query returned no rows"
+        )
     row = rows[0]
 
     if metric.kind == "rowwise":
@@ -59,22 +73,38 @@ def run_case(case: TestCase, executor: SqlExecutor) -> TestResult:
             ok = pct <= case.max_failed_pct
             tolerance = f"{case.max_failed_pct}%"
         return TestResult(
-            case=case, dimension=metric.dimension, status=Status.SUCCESS if ok else Status.FAILED,
-            total_rows=total, failed_rows=failed, failed_pct=round(pct, 4), sql=sql,
+            case=case,
+            dimension=metric.dimension,
+            status=Status.SUCCESS if ok else Status.FAILED,
+            total_rows=total,
+            failed_rows=failed,
+            failed_pct=round(pct, 4),
+            sql=sql,
             message=f"{failed}/{total} rows failed ({pct:.2f}%), tolerance {tolerance}",
         )
 
     observed = row.get("observed")
     if observed is None:
-        return TestResult(case=case, dimension=metric.dimension, status=Status.ABORTED, sql=sql,
-                          message="metric produced NULL (empty table or all-null column)")
+        return TestResult(
+            case=case,
+            dimension=metric.dimension,
+            status=Status.ABORTED,
+            sql=sql,
+            message="metric produced NULL (empty table or all-null column)",
+        )
     observed = float(observed)
     bounds = dict(case.params)
     if case.metric == "freshness_hours":
         bounds = {"max": case.params["max_age_hours"]}
     ok = _within(observed, bounds)
-    return TestResult(case=case, dimension=metric.dimension, status=Status.SUCCESS if ok else Status.FAILED,
-                      observed=observed, sql=sql, message=f"observed {observed:g}, expected {bounds}")
+    return TestResult(
+        case=case,
+        dimension=metric.dimension,
+        status=Status.SUCCESS if ok else Status.FAILED,
+        observed=observed,
+        sql=sql,
+        message=f"observed {observed:g}, expected {bounds}",
+    )
 
 
 def run_cases(cases: Iterable[TestCase], executor: SqlExecutor) -> list[TestResult]:

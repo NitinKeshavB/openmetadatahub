@@ -4,19 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openmetadatahub"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Data quality, data contracts, Databricks access governance and AI governance in one metadata hub."
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 dependencies = [
   "pydantic>=2.6",
   "pyyaml>=6.0",
+  "loguru>=0.7",
 ]
 
 [project.optional-dependencies]
 databricks = ["databricks-sql-connector>=3.0"]
 api = ["fastapi>=0.110", "uvicorn>=0.29"]
-dev = ["openmetadatahub[api]", "pytest>=8", "httpx>=0.27", "sqlglot>=25", "pyspark>=4.0", "databricks-bundles", "build"]
+test = ["pytest>=8", "pytest-cov", "httpx>=0.27", "sqlglot>=25", "pyspark>=4.0", "pyyaml>=6.0"]
+static-code-qa = ["pre-commit", "black==24.10.0", "isort", "flake8", "flake8-docstrings", "radon", "mypy"]
+release = ["build", "twine"]
+dev = ["openmetadatahub[api,test,static-code-qa,release]", "databricks-bundles"]
 
 [project.scripts]
 openmetadatahub = "openmetadatahub.cli:main"
@@ -24,9 +28,24 @@ omh-enforce-contracts = "openmetadatahub.jobs.entrypoints:enforce_contracts_main
 omh-audit-access = "openmetadatahub.jobs.entrypoints:audit_access_main"
 omh-assess-ai = "openmetadatahub.jobs.entrypoints:assess_ai_main"
 
+[tool.setuptools.dynamic]
+version = { file = "version.txt" }
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.black]
+line-length = 119
+
+[tool.isort]
+profile = "black"
+multi_line_output = "VERTICAL_HANGING_INDENT"
+force_grid_wrap = 2
+line_length = 119
+
+[tool.coverage.run]
+source = ["src/openmetadatahub"]

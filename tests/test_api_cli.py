@@ -1,21 +1,23 @@
 import json
 
+from conftest import CONTRACT_V1
 from fastapi.testclient import TestClient
+from test_ai import MANIFESTS
 
 from openmetadatahub.api import create_app
 from openmetadatahub.cli import main
 
-from conftest import CONTRACT_V1
-from test_ai import MANIFESTS
-
 
 def test_api_end_to_end(fake):
-    fake.when("information_schema.columns", [
-        {"column_name": "order_id", "data_type": "BIGINT", "is_nullable": "NO"},
-        {"column_name": "email", "data_type": "STRING", "is_nullable": "YES"},
-        {"column_name": "status", "data_type": "STRING", "is_nullable": "NO"},
-        {"column_name": "updated_at", "data_type": "TIMESTAMP", "is_nullable": "YES"},
-    ])
+    fake.when(
+        "information_schema.columns",
+        [
+            {"column_name": "order_id", "data_type": "BIGINT", "is_nullable": "NO"},
+            {"column_name": "email", "data_type": "STRING", "is_nullable": "YES"},
+            {"column_name": "status", "data_type": "STRING", "is_nullable": "NO"},
+            {"column_name": "updated_at", "data_type": "TIMESTAMP", "is_nullable": "YES"},
+        ],
+    )
     fake.when("IS NULL", [{"total_rows": 10, "failed_rows": 0}])
     fake.when("GROUP BY", [{"total_rows": 10, "failed_rows": 0}])
     fake.when("RLIKE", [{"total_rows": 10, "failed_rows": 0}])
@@ -49,7 +51,13 @@ def test_api_end_to_end(fake):
 
 def test_api_without_a_warehouse_fails_loudly_not_silently():
     client = TestClient(create_app(), raise_server_exceptions=False)
-    r = client.post("/dq/run", json={"table": "a.b.c", "cases": [{"name": "n", "table": "a.b.c", "metric": "row_count", "params": {"min": 1}}]})
+    r = client.post(
+        "/dq/run",
+        json={
+            "table": "a.b.c",
+            "cases": [{"name": "n", "table": "a.b.c", "metric": "row_count", "params": {"min": 1}}],
+        },
+    )
     assert r.status_code == 200 and r.json()["aborted"] == 1  # reported as aborted, not as a pass
 
 

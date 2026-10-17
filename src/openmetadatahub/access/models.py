@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import (
+    BaseModel,
+    Field,
+)
 
 from ..common import Severity
 
@@ -51,17 +54,20 @@ class ClassificationRule(BaseModel):
     values: list[str]
     require_mask: bool = True
     mask_function: str | None = Field(default=None, description="catalog.schema.fn used in remediation hints")
-    allowed_principals: list[str] = Field(default_factory=list,
-                                          description="Only these principals may SELECT an unmasked sensitive column")
+    allowed_principals: list[str] = Field(
+        default_factory=list, description="Only these principals may SELECT an unmasked sensitive column"
+    )
     deny_principals: list[str] = Field(default_factory=list)
 
 
 class AccessPolicy(BaseModel):
     classification_rules: list[ClassificationRule] = Field(default_factory=list)
-    admin_principals: list[str] = Field(default_factory=list,
-                                        description="Principals exempt from unexpected-grant findings")
-    role_principals: dict[str, str] = Field(default_factory=dict,
-                                            description="Maps contract role -> Databricks group; defaults to the role name")
+    admin_principals: list[str] = Field(
+        default_factory=list, description="Principals exempt from unexpected-grant findings"
+    )
+    role_principals: dict[str, str] = Field(
+        default_factory=dict, description="Maps contract role -> Databricks group; defaults to the role name"
+    )
     flag_direct_user_grants: bool = True
 
     @classmethod

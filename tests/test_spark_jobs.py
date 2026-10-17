@@ -7,12 +7,24 @@ import pytest
 
 pytest.importorskip("pyspark")
 
-from openmetadatahub.jobs import (ConfigError, EnforcementFailed, JobConfig, ResultStore, assess_ai, audit_access,  # noqa: E402
-                                  enforce_contracts)
-from openmetadatahub.jobs.entrypoints import enforce_contracts_main  # noqa: E402
-
 from conftest import CONTRACT_V1  # noqa: E402
-from spark_support import CAT, LocalExecutor, refresh_information_schema, set_rows  # noqa: E402
+from spark_support import (  # noqa: E402
+    CAT,
+    LocalExecutor,
+    refresh_information_schema,
+    set_rows,
+)
+
+from openmetadatahub.jobs import audit_access  # noqa: E402
+from openmetadatahub.jobs import (  # noqa: E402
+    ConfigError,
+    EnforcementFailed,
+    JobConfig,
+    ResultStore,
+    assess_ai,
+    enforce_contracts,
+)
+from openmetadatahub.jobs.entrypoints import enforce_contracts_main  # noqa: E402
 
 CONTRACT = CONTRACT_V1.replace("main.sales.orders", f"{CAT}.shop.orders")
 _n = itertools.count()
@@ -22,10 +34,15 @@ def make_orders(spark, *, healthy: bool):
     spark.sql("CREATE DATABASE IF NOT EXISTS shop")
     spark.sql("DROP TABLE IF EXISTS shop.orders")
     age = "1 HOURS" if healthy else "48 HOURS"
-    rows = ("(1,'a@x.com','NEW',5.0),(2,'b@x.com','PAID',6.0),(3,'c@x.com','SHIPPED',7.0)" if healthy else
-            "(1,'a@x.com','NEW',5.0),(1,'bad-email','WEIRD',-6.0),(3,NULL,NULL,7.0)")
-    spark.sql(f"CREATE TABLE shop.orders AS SELECT *, current_timestamp() - INTERVAL {age} AS updated_at "
-              f"FROM VALUES {rows} AS t(order_id, email, status, amount)")
+    rows = (
+        "(1,'a@x.com','NEW',5.0),(2,'b@x.com','PAID',6.0),(3,'c@x.com','SHIPPED',7.0)"
+        if healthy
+        else "(1,'a@x.com','NEW',5.0),(1,'bad-email','WEIRD',-6.0),(3,NULL,NULL,7.0)"
+    )
+    spark.sql(
+        f"CREATE TABLE shop.orders AS SELECT *, current_timestamp() - INTERVAL {age} AS updated_at "
+        f"FROM VALUES {rows} AS t(order_id, email, status, amount)"
+    )
     refresh_information_schema(spark)
 
 
@@ -43,8 +60,17 @@ def env(spark, tmp_path):
     def table(name):
         return spark.table(f"{CAT}.{schema}.{name}")
 
-    return type("Env", (), {"folder": folder, "cfg": staticmethod(cfg), "table": staticmethod(table), "spark": spark,
-                            "executor": LocalExecutor(spark)})
+    return type(
+        "Env",
+        (),
+        {
+            "folder": folder,
+            "cfg": staticmethod(cfg),
+            "table": staticmethod(table),
+            "spark": spark,
+            "executor": LocalExecutor(spark),
+        },
+    )
 
 
 def test_healthy_data_passes_and_everything_is_recorded(env):
@@ -72,10 +98,12 @@ def test_violations_close_the_gate_but_everything_is_still_recorded(env):
     run = env.table("contract_runs").collect()[0]
     assert run.decision == "blocked" and run.blocking >= 4
     failed = {r.test_name for r in env.table("dq_results").where("status = 'failed'").collect()}
-    assert "orders.order_id:unique" in failed            # duplicate id
-    assert "orders.email:invalidValues" in failed        # 'bad-email'
-    assert "orders.updated_at:sla-freshness" in failed   # 48h old against a 24h SLA
-    assert "orders:sql0" in failed or any(n.endswith(":custom_sql") or "sql" in n.lower() for n in failed)  # amount < 0
+    assert "orders.order_id:unique" in failed  # duplicate id
+    assert "orders.email:invalidValues" in failed  # 'bad-email'
+    assert "orders.updated_at:sla-freshness" in failed  # 48h old against a 24h SLA
+    assert "orders:sql0" in failed or any(
+        n.endswith(":custom_sql") or "sql" in n.lower() for n in failed
+    )  # amount < 0
     assert env.table("quality_scores").collect()[0].score < 100
 
 
@@ -113,12 +141,16 @@ def test_unreadable_evidence_never_counts_as_a_pass(env, tmp_path):
     empty = tmp_path / "empty"
     empty.mkdir()
     with pytest.raises(ConfigError, match="no contracts found"):
-        enforce_contracts(env.spark, JobConfig(contracts_path=str(empty), results_catalog=CAT, results_schema="governance_x"))
+        enforce_contracts(
+            env.spark, JobConfig(contracts_path=str(empty), results_catalog=CAT, results_schema="governance_x")
+        )
     (env.folder / "broken.yaml").unlink()  # an unparseable file could be the requested id, so it blocks instead
     with pytest.raises(ConfigError, match="nope"):
         enforce_contracts(env.spark, env.cfg(contract_ids=("nope",)))
     with pytest.raises(ConfigError, match="path not found"):
-        enforce_contracts(env.spark, JobConfig(contracts_path="/does/not/exist", results_catalog=CAT, results_schema="governance_x"))
+        enforce_contracts(
+            env.spark, JobConfig(contracts_path="/does/not/exist", results_catalog=CAT, results_schema="governance_x")
+        )
 
 
 def test_a_breaking_change_without_a_major_bump_blocks_until_a_compliant_version_replaces_it(env):
@@ -126,18 +158,18 @@ def test_a_breaking_change_without_a_major_bump_blocks_until_a_compliant_version
     assert enforce_contracts(env.spark, env.cfg()).decisions["orders-contract"] == "pass"
 
     breaking = CONTRACT.replace("      - name: updated_at\n        logicalType: timestamp\n", "")
-    (env.folder / "orders.yaml").write_text(breaking)          # column removed, still version 1.0.0
+    (env.folder / "orders.yaml").write_text(breaking)  # column removed, still version 1.0.0
     with pytest.raises(EnforcementFailed):
         enforce_contracts(env.spark, env.cfg())
     note = env.table("contract_versions").where("NOT version_ok").collect()[0].diff_summary
     assert "required major bump, declared none" in note and "column-removed:orders.updated_at" in note
 
-    with pytest.raises(EnforcementFailed):                      # nothing changed: the verdict persists, no free pass
+    with pytest.raises(EnforcementFailed):  # nothing changed: the verdict persists, no free pass
         enforce_contracts(env.spark, env.cfg())
-    assert env.table("contract_versions").count() == 2          # no duplicate row for an unchanged file
+    assert env.table("contract_versions").count() == 2  # no duplicate row for an unchanged file
 
     (env.folder / "orders.yaml").write_text(breaking.replace("version: 1.0.0", "version: 1.0.1"))
-    with pytest.raises(EnforcementFailed):                      # a patch bump does not legitimise a breaking change
+    with pytest.raises(EnforcementFailed):  # a patch bump does not legitimise a breaking change
         enforce_contracts(env.spark, env.cfg())
 
     (env.folder / "orders.yaml").write_text(breaking.replace("version: 1.0.0", "version: 2.0.0"))
@@ -146,15 +178,32 @@ def test_a_breaking_change_without_a_major_bump_blocks_until_a_compliant_version
 
 def test_entry_point_runs_the_same_job_from_cli_arguments(env, capsys):
     make_orders(env.spark, healthy=True)
-    args = ["--contracts-path", str(env.folder), "--results-catalog", CAT, "--results-schema", env.cfg().results_schema,
-            "--run-id", "job-run-42", "--contract-ids", "orders-contract"]
+    args = [
+        "--contracts-path",
+        str(env.folder),
+        "--results-catalog",
+        CAT,
+        "--results-schema",
+        env.cfg().results_schema,
+        "--run-id",
+        "job-run-42",
+        "--contract-ids",
+        "orders-contract",
+    ]
     enforce_contracts_main(args)
-    assert "[contracts] pass     orders-contract" in capsys.readouterr().out
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])["record"]
+    assert line["message"] == "[contracts] pass orders-contract" and line["extra"]["run_id"] == "job-run-42"
     assert env.table("contract_runs").collect()[0].run_id == "job-run-42"
+    events = env.table("run_events").orderBy("seq").collect()
+    assert [(e.run_id, e.level, e.message) for e in events] == [
+        ("job-run-42", "INFO", "[contracts] pass orders-contract")
+    ]
 
     make_orders(env.spark, healthy=False)
     with pytest.raises(EnforcementFailed):
         enforce_contracts_main(args)
+    failed = env.table("run_events").where("level = 'ERROR'").collect()
+    assert len(failed) == 1 and "omh-enforce-contracts failed" in failed[0].message  # recorded even though it raised
 
 
 # ------------------------------------------------------------------ access
@@ -175,7 +224,11 @@ def _g(p, a, t, k):
 
 
 COMPLIANT_GRANTS = {
-    "TABLE": [_g("analysts-grp", "SELECT", "TABLE", "t"), _g("etl-grp", "SELECT", "TABLE", "t"), _g("etl-grp", "MODIFY", "TABLE", "t")],
+    "TABLE": [
+        _g("analysts-grp", "SELECT", "TABLE", "t"),
+        _g("etl-grp", "SELECT", "TABLE", "t"),
+        _g("etl-grp", "MODIFY", "TABLE", "t"),
+    ],
     "SCHEMA": [_g("analysts-grp", "USE SCHEMA", "SCHEMA", "s"), _g("etl-grp", "USE SCHEMA", "SCHEMA", "s")],
     "CATALOG": [_g("analysts-grp", "USE CATALOG", "CATALOG", "c"), _g("etl-grp", "USE CATALOG", "CATALOG", "c")],
 }
@@ -200,7 +253,7 @@ def test_access_audit_blocks_unmasked_pii_and_passes_when_fixed(env, tmp_path):
     codes = {r.code: r.severity for r in env.table("access_findings").collect()}
     assert codes["forbidden-grantee"] == "critical" and "unmasked-sensitive-column" in codes
     remedy = env.table("access_findings").where("code = 'forbidden-grantee'").collect()[0].remedy
-    assert remedy.startswith("REVOKE SELECT ON TABLE")                      # advice only: nothing was executed
+    assert remedy.startswith("REVOKE SELECT ON TABLE")  # advice only: nothing was executed
     assert env.spark.sql("SELECT COUNT(*) c FROM shop.orders").collect()[0].c == 3
 
     _tag_and_mask(env.spark, masked=True)
@@ -278,8 +331,10 @@ def test_ai_gate_uses_the_stored_quality_and_access_evidence(env, tmp_path):
     enforce_contracts(env.spark, env.cfg(enforcement="report"))
     with pytest.raises(EnforcementFailed, match="odh:prod/churn"):
         assess_ai(env.spark, cfg)
-    assert any(c["status"] == "fail" and c["code"].startswith("quality:")
-               for c in json.loads(env.table("ai_assessments").orderBy("run_ts").collect()[-1].checks))
+    assert any(
+        c["status"] == "fail" and c["code"].startswith("quality:")
+        for c in json.loads(env.table("ai_assessments").orderBy("run_ts").collect()[-1].checks)
+    )
 
 
 def test_stale_evidence_counts_as_missing(env, tmp_path):
@@ -290,4 +345,6 @@ def test_stale_evidence_counts_as_missing(env, tmp_path):
     with pytest.raises(EnforcementFailed):
         assess_ai(env.spark, env.cfg(ai_manifests_path=str(manifests), max_evidence_age_hours=0))
     assert ResultStore(env.spark, CAT, env.cfg().results_schema).latest_quality_scores(0) == {}
-    assert list(ResultStore(env.spark, CAT, env.cfg().results_schema).latest_quality_scores(48)) == [f"{CAT}.shop.orders"]
+    assert list(ResultStore(env.spark, CAT, env.cfg().results_schema).latest_quality_scores(48)) == [
+        f"{CAT}.shop.orders"
+    ]

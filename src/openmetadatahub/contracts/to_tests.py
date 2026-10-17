@@ -4,15 +4,34 @@ from __future__ import annotations
 
 from ..common import Severity
 from ..dq.models import TestCase
-from .odcs import DataContract, QualityRule, SchemaObject
+from .odcs import (
+    DataContract,
+    QualityRule,
+    SchemaObject,
+)
 
 _SEVERITY = {
-    "info": Severity.INFO, "warning": Severity.WARNING, "warn": Severity.WARNING,
-    "error": Severity.ERROR, "critical": Severity.CRITICAL,
+    "info": Severity.INFO,
+    "warning": Severity.WARNING,
+    "warn": Severity.WARNING,
+    "error": Severity.ERROR,
+    "critical": Severity.CRITICAL,
 }
 
-_UNIT_HOURS = {"h": 1.0, "hour": 1.0, "hours": 1.0, "d": 24.0, "day": 24.0, "days": 24.0,
-               "m": 1 / 60, "min": 1 / 60, "minutes": 1 / 60, "y": 24 * 365.0, "year": 24 * 365.0, "years": 24 * 365.0}
+_UNIT_HOURS = {
+    "h": 1.0,
+    "hour": 1.0,
+    "hours": 1.0,
+    "d": 24.0,
+    "day": 24.0,
+    "days": 24.0,
+    "m": 1 / 60,
+    "min": 1 / 60,
+    "minutes": 1 / 60,
+    "y": 24 * 365.0,
+    "year": 24 * 365.0,
+    "years": 24 * 365.0,
+}
 
 
 def _sev(rule: QualityRule, default: Severity = Severity.ERROR) -> Severity:
@@ -67,12 +86,39 @@ def _rule_cases(rule: QualityRule, table: str, column: str | None, contract: Dat
     if m == "duplicateValues" and column:
         return [TestCase(name=name, metric="column_unique", column=column, **tol, **base)]
     if m == "missingValues" and column and "missingValues" in args:
-        return [TestCase(name=name, metric="column_not_in_set", column=column, params={"values": args["missingValues"]}, **tol, **base)]
+        return [
+            TestCase(
+                name=name,
+                metric="column_not_in_set",
+                column=column,
+                params={"values": args["missingValues"]},
+                **tol,
+                **base,
+            )
+        ]
     if m == "invalidValues" and column:
         if "validValues" in args:
-            return [TestCase(name=name, metric="column_in_set", column=column, params={"values": args["validValues"]}, **tol, **base)]
+            return [
+                TestCase(
+                    name=name,
+                    metric="column_in_set",
+                    column=column,
+                    params={"values": args["validValues"]},
+                    **tol,
+                    **base,
+                )
+            ]
         if "pattern" in args:
-            return [TestCase(name=name, metric="column_matches_regex", column=column, params={"pattern": args["pattern"]}, **tol, **base)]
+            return [
+                TestCase(
+                    name=name,
+                    metric="column_matches_regex",
+                    column=column,
+                    params={"pattern": args["pattern"]},
+                    **tol,
+                    **base,
+                )
+            ]
         rng = {k: args[k2] for k, k2 in (("min", "minValue"), ("max", "maxValue")) if k2 in args}
         if rng:
             return [TestCase(name=name, metric="column_between", column=column, params=rng, **tol, **base)]
@@ -88,11 +134,25 @@ def contract_to_tests(contract: DataContract, namespace: str | None = None) -> l
         short = obj.name
         for prop in obj.properties:
             if prop.required or prop.primaryKey:
-                cases.append(TestCase(name=f"{short}.{prop.name}:required", table=table, column=prop.name,
-                                      metric="column_not_null", source=contract.id))
+                cases.append(
+                    TestCase(
+                        name=f"{short}.{prop.name}:required",
+                        table=table,
+                        column=prop.name,
+                        metric="column_not_null",
+                        source=contract.id,
+                    )
+                )
             if prop.unique or prop.primaryKey:
-                cases.append(TestCase(name=f"{short}.{prop.name}:unique", table=table, column=prop.name,
-                                      metric="column_unique", source=contract.id))
+                cases.append(
+                    TestCase(
+                        name=f"{short}.{prop.name}:unique",
+                        table=table,
+                        column=prop.name,
+                        metric="column_unique",
+                        source=contract.id,
+                    )
+                )
             for i, rule in enumerate(prop.quality):
                 cases += _rule_cases(rule, table, prop.name, contract, i)
         for i, rule in enumerate(obj.quality):
@@ -113,7 +173,15 @@ def _sla_cases(contract: DataContract, obj: SchemaObject, table: str) -> list[Te
             hours = float(sla.value) * _UNIT_HOURS[(sla.unit or "h").lower()]
         except (ValueError, KeyError):
             continue
-        out.append(TestCase(name=f"{obj.name}.{col}:sla-{sla.property}", table=table, column=col,
-                            metric="freshness_hours", params={"max_age_hours": hours},
-                            severity=Severity.ERROR, source=contract.id))
+        out.append(
+            TestCase(
+                name=f"{obj.name}.{col}:sla-{sla.property}",
+                table=table,
+                column=col,
+                metric="freshness_hours",
+                params={"max_age_hours": hours},
+                severity=Severity.ERROR,
+                source=contract.id,
+            )
+        )
     return out

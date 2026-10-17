@@ -5,9 +5,17 @@ All remediation is returned as dry-run SQL text. This library has no write path 
 
 from __future__ import annotations
 
-from ..common import Severity, quote_fqn, quote_ident
+from ..common import (
+    Severity,
+    quote_fqn,
+    quote_ident,
+)
 from ..contracts.odcs import DataContract
-from .models import AccessPolicy, AccessSnapshot, Finding
+from .models import (
+    AccessPolicy,
+    AccessSnapshot,
+    Finding,
+)
 
 _READ = {"SELECT", "ALL PRIVILEGES"}
 _WRITE = {"MODIFY", "ALL PRIVILEGES"}
@@ -25,8 +33,12 @@ def _revoke(table: str, priv: str, principal: str) -> str:
     return f"REVOKE {priv} ON TABLE {quote_fqn(table)} FROM {quote_ident(principal)};"
 
 
-def evaluate(snap: AccessSnapshot, policy: AccessPolicy, contract: DataContract | None = None,
-             contract_object: str | None = None) -> list[Finding]:
+def evaluate(
+    snap: AccessSnapshot,
+    policy: AccessPolicy,
+    contract: DataContract | None = None,
+    contract_object: str | None = None,
+) -> list[Finding]:
     f: list[Finding] = []
     admins = set(policy.admin_principals)
     eff = effective_privileges(snap)
@@ -42,8 +54,16 @@ def evaluate(snap: AccessSnapshot, policy: AccessPolicy, contract: DataContract 
             continue
         if policy.flag_direct_user_grants and "@" in g.principal:
             rem = _revoke(t, g.privilege, g.principal) if g.level == "table" and not g.inherited_from else None
-            f.append(Finding(table=t, code="direct-user-grant", severity=Severity.WARNING, principal=g.principal,
-                             message=f"{g.privilege} granted to an individual user; grant to a group instead", remedy=rem))
+            f.append(
+                Finding(
+                    table=t,
+                    code="direct-user-grant",
+                    severity=Severity.WARNING,
+                    principal=g.principal,
+                    message=f"{g.privilege} granted to an individual user; grant to a group instead",
+                    remedy=rem,
+                )
+            )
 
     # Classification-driven
     for rule in policy.classification_rules:
@@ -56,22 +76,54 @@ def evaluate(snap: AccessSnapshot, policy: AccessPolicy, contract: DataContract 
             is_masked = col.lower() in masked
             if rule.require_mask and not is_masked:
                 exposed = [p for p in readers if p not in rule.allowed_principals]
-                hint = (f"ALTER TABLE {quote_fqn(t)} ALTER COLUMN {quote_ident(col)} SET MASK {quote_fqn(rule.mask_function)};"
-                        if rule.mask_function else None)
+                hint = (
+                    f"ALTER TABLE {quote_fqn(t)} ALTER COLUMN {quote_ident(col)} SET MASK "
+                    f"{quote_fqn(rule.mask_function)};"
+                    if rule.mask_function
+                    else None
+                )
                 if exposed:
-                    f.append(Finding(table=t, column=col, code="unmasked-sensitive-column", severity=Severity.ERROR,
-                                     message=f"{rule.tag}={tag.value} column has no column mask and is readable by: {', '.join(sorted(exposed))}",
-                                     remedy=hint))
+                    f.append(
+                        Finding(
+                            table=t,
+                            column=col,
+                            code="unmasked-sensitive-column",
+                            severity=Severity.ERROR,
+                            message=(
+                                f"{rule.tag}={tag.value} column has no column mask and is readable by: "
+                                f"{', '.join(sorted(exposed))}"
+                            ),
+                            remedy=hint,
+                        )
+                    )
                 else:
-                    f.append(Finding(table=t, column=col, code="unmasked-sensitive-column", severity=Severity.INFO,
-                                     message=f"{rule.tag}={tag.value} column has no column mask; only allowed principals can read it today",
-                                     remedy=hint))
+                    f.append(
+                        Finding(
+                            table=t,
+                            column=col,
+                            code="unmasked-sensitive-column",
+                            severity=Severity.INFO,
+                            message=(
+                                f"{rule.tag}={tag.value} column has no column mask; only allowed principals can "
+                                "read it today"
+                            ),
+                            remedy=hint,
+                        )
+                    )
             if not is_masked:
                 for p in rule.deny_principals:
                     if eff.get(p, set()) & _READ:
-                        f.append(Finding(table=t, column=col, principal=p, code="forbidden-grantee", severity=Severity.CRITICAL,
-                                         message=f"{p} can read unmasked {rule.tag}={tag.value} column",
-                                         remedy=_revoke(t, "SELECT", p)))
+                        f.append(
+                            Finding(
+                                table=t,
+                                column=col,
+                                principal=p,
+                                code="forbidden-grantee",
+                                severity=Severity.CRITICAL,
+                                message=f"{p} can read unmasked {rule.tag}={tag.value} column",
+                                remedy=_revoke(t, "SELECT", p),
+                            )
+                        )
 
     # Contract roles
     if contract is not None:
@@ -94,25 +146,57 @@ def _contract_findings(snap, policy, contract, obj_name, eff, admins) -> list[Fi
         for priv in sorted(needs):
             ok = priv in have or "ALL PRIVILEGES" in have
             if not ok:
-                out.append(Finding(table=t, principal=principal, code="missing-grant", severity=Severity.ERROR,
-                                   message=f"contract role requires {priv} but {principal} does not hold it",
-                                   remedy=f"GRANT {priv} ON TABLE {quote_fqn(t)} TO {quote_ident(principal)};"))
+                out.append(
+                    Finding(
+                        table=t,
+                        principal=principal,
+                        code="missing-grant",
+                        severity=Severity.ERROR,
+                        message=f"contract role requires {priv} but {principal} does not hold it",
+                        remedy=f"GRANT {priv} ON TABLE {quote_fqn(t)} TO {quote_ident(principal)};",
+                    )
+                )
         usage = {p.privilege for p in snap.grants if p.principal == principal and p.level in ("catalog", "schema")}
         if "ALL PRIVILEGES" not in usage:
             if "USE CATALOG" not in usage:
-                out.append(Finding(table=t, principal=principal, code="missing-usage", severity=Severity.WARNING,
-                                   message=f"{principal} lacks USE CATALOG on {cat}; table grants alone are not enough",
-                                   remedy=f"GRANT USE CATALOG ON CATALOG {quote_ident(cat)} TO {quote_ident(principal)};"))
+                out.append(
+                    Finding(
+                        table=t,
+                        principal=principal,
+                        code="missing-usage",
+                        severity=Severity.WARNING,
+                        message=f"{principal} lacks USE CATALOG on {cat}; table grants alone are not enough",
+                        remedy=f"GRANT USE CATALOG ON CATALOG {quote_ident(cat)} TO {quote_ident(principal)};",
+                    )
+                )
             if "USE SCHEMA" not in usage:
-                out.append(Finding(table=t, principal=principal, code="missing-usage", severity=Severity.WARNING,
-                                   message=f"{principal} lacks USE SCHEMA on {cat}.{sch}",
-                                   remedy=f"GRANT USE SCHEMA ON SCHEMA {quote_ident(cat)}.{quote_ident(sch)} TO {quote_ident(principal)};"))
+                out.append(
+                    Finding(
+                        table=t,
+                        principal=principal,
+                        code="missing-usage",
+                        severity=Severity.WARNING,
+                        message=f"{principal} lacks USE SCHEMA on {cat}.{sch}",
+                        remedy=(
+                            f"GRANT USE SCHEMA ON SCHEMA {quote_ident(cat)}.{quote_ident(sch)} TO "
+                            f"{quote_ident(principal)};"
+                        ),
+                    )
+                )
 
     for g in snap.grants:
         if g.principal in admins or g.principal in expected or g.privilege not in (_READ | _WRITE | {"MODIFY"}):
             continue
         origin = f"inherited from {g.inherited_from}" if g.inherited_from else f"direct {g.level}-level grant"
         rem = _revoke(t, g.privilege, g.principal) if (g.level == "table" and not g.inherited_from) else None
-        out.append(Finding(table=t, principal=g.principal, code="unexpected-grant", severity=Severity.WARNING,
-                           message=f"{g.principal} holds {g.privilege} ({origin}) but no contract role maps to it", remedy=rem))
+        out.append(
+            Finding(
+                table=t,
+                principal=g.principal,
+                code="unexpected-grant",
+                severity=Severity.WARNING,
+                message=f"{g.principal} holds {g.privilege} ({origin}) but no contract role maps to it",
+                remedy=rem,
+            )
+        )
     return out

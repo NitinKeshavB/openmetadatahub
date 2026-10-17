@@ -1,0 +1,8 @@
+[flake8]
+max-line-length = 119
+extend-ignore = E203,W503
+# baseline: the most complex existing function (api.create_app) is 18; ratchet this down, never up
+max-complexity = 18
+per-file-ignores =
+    tests/*:D
+exclude = .venv,build,dist

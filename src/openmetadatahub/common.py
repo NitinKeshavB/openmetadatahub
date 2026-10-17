@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Any, Protocol
+from typing import (
+    Any,
+    Protocol,
+)
 
 Row = dict[str, Any]
 

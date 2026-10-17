@@ -6,9 +6,16 @@ import pytest
 
 pytest.importorskip("pyspark")
 
-from openmetadatahub.dq import Status, TestCase, run_case  # noqa: E402
+from spark_support import (  # noqa: E402
+    LocalExecutor,
+    refresh_information_schema,
+)
 
-from spark_support import LocalExecutor, refresh_information_schema  # noqa: E402
+from openmetadatahub.dq import (  # noqa: E402
+    Status,
+    TestCase,
+    run_case,
+)
 
 AMOUNTS = [10.0, 20.0, 30.0, 40.0, 50.0, -5.0, 60.0, 70.0, 80.0, 90.0]
 
@@ -18,11 +25,20 @@ def lake(spark):
     spark.sql("CREATE DATABASE IF NOT EXISTS sales")
     spark.sql("DROP TABLE IF EXISTS sales.orders")
     rows = [
-        (1, "a@x.com", "NEW"), (2, "b@x.com", "PAID"), (3, "bad-email", "PAID"), (4, None, "NEW"),
-        (5, "e@x.com", "WEIRD"), (6, "f@x.com", "SHIPPED"), (7, "g@x.com", "NEW"), (7, "h@x.com", "NEW"),
-        (8, "i@x.com", "PAID"), (9, "j@x.com", None),
+        (1, "a@x.com", "NEW"),
+        (2, "b@x.com", "PAID"),
+        (3, "bad-email", "PAID"),
+        (4, None, "NEW"),
+        (5, "e@x.com", "WEIRD"),
+        (6, "f@x.com", "SHIPPED"),
+        (7, "g@x.com", "NEW"),
+        (7, "h@x.com", "NEW"),
+        (8, "i@x.com", "PAID"),
+        (9, "j@x.com", None),
     ]
-    df = spark.createDataFrame([(*r, a) for r, a in zip(rows, AMOUNTS)], "id int, email string, status string, amount double")
+    df = spark.createDataFrame(
+        [(*r, a) for r, a in zip(rows, AMOUNTS)], "id int, email string, status string, amount double"
+    )
     df.createOrReplaceTempView("_o")
     spark.sql("CREATE TABLE sales.orders AS SELECT *, current_timestamp() - INTERVAL 2 HOURS AS updated_at FROM _o")
     spark.sql("DROP TABLE IF EXISTS sales.dim")
@@ -32,7 +48,14 @@ def lake(spark):
 
 
 def case(metric, column=None, **params):
-    return TestCase(name=metric, table="spark_catalog.sales.orders", column=column, metric=metric, params=params, max_failed_pct=100)
+    return TestCase(
+        name=metric,
+        table="spark_catalog.sales.orders",
+        column=column,
+        metric=metric,
+        params=params,
+        max_failed_pct=100,
+    )
 
 
 # metric -> (case, expected). expected is ("rows", total, failed) or ("value", observed)
@@ -44,7 +67,10 @@ EXPECT = {
     "column_matches_regex": (case("column_matches_regex", "email", pattern="^[^@]+@[^@]+$"), ("rows", 10, 1)),
     "column_between": (case("column_between", "amount", min=0, max=100), ("rows", 10, 1)),
     "column_length_between": (case("column_length_between", "status", min=3, max=5), ("rows", 10, 1)),
-    "column_fk_exists": (case("column_fk_exists", "id", ref_table="spark_catalog.sales.dim", ref_column="id"), ("rows", 10, 1)),
+    "column_fk_exists": (
+        case("column_fk_exists", "id", ref_table="spark_catalog.sales.dim", ref_column="id"),
+        ("rows", 10, 1),
+    ),
     "row_count": (case("row_count", min=1), ("value", 10.0)),
     "null_pct": (case("null_pct", "email", max=100), ("value", 10.0)),
     "column_min": (case("column_min", "amount", min=-100), ("value", -5.0)),
@@ -53,7 +79,10 @@ EXPECT = {
     "column_sum": (case("column_sum", "amount", max=1000), ("value", sum(AMOUNTS))),
     "column_stddev": (case("column_stddev", "amount", max=1000), ("value", statistics.stdev(AMOUNTS))),
     "column_count": (case("column_count", min=1), ("value", 5.0)),
-    "custom_sql": (case("custom_sql", sql="SELECT COUNT(*) FROM spark_catalog.sales.orders WHERE amount < 0", max=10), ("value", 1.0)),
+    "custom_sql": (
+        case("custom_sql", sql="SELECT COUNT(*) FROM spark_catalog.sales.orders WHERE amount < 0", max=10),
+        ("value", 1.0),
+    ),
 }
 
 

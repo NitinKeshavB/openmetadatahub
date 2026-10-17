@@ -10,7 +10,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from ..common import quote_ident, sql_literal
+from ..common import (
+    quote_ident,
+    sql_literal,
+)
 
 TABLES: dict[str, str] = {
     "contract_runs": (
@@ -19,7 +22,8 @@ TABLES: dict[str, str] = {
         "version_ok BOOLEAN, blocking INT, decision STRING, detail STRING"
     ),
     "dq_results": (
-        "run_id STRING, run_ts TIMESTAMP, contract_id STRING, test_name STRING, table_name STRING, column_name STRING, "
+        "run_id STRING, run_ts TIMESTAMP, contract_id STRING, test_name STRING, table_name STRING, column_name "
+        "STRING, "
         "metric STRING, dimension STRING, severity STRING, status STRING, observed DOUBLE, total_rows BIGINT, "
         "failed_rows BIGINT, failed_pct DOUBLE, message STRING, sql_text STRING"
     ),
@@ -36,7 +40,8 @@ TABLES: dict[str, str] = {
         "first_seen_ts TIMESTAMP, version_ok BOOLEAN, diff_summary STRING"
     ),
     "access_audits": (
-        "run_id STRING, run_ts TIMESTAMP, table_name STRING, contract_id STRING, findings INT, blocking INT, caveats STRING"
+        "run_id STRING, run_ts TIMESTAMP, table_name STRING, contract_id STRING, findings INT, blocking INT, caveats "
+        "STRING"
     ),
     "access_findings": (
         "run_id STRING, run_ts TIMESTAMP, table_name STRING, code STRING, severity STRING, principal STRING, "
@@ -46,6 +51,7 @@ TABLES: dict[str, str] = {
         "run_id STRING, run_ts TIMESTAMP, asset_id STRING, asset_name STRING, stage STRING, risk_class STRING, "
         "blocked BOOLEAN, checks STRING, control_coverage STRING"
     ),
+    "run_events": ("run_id STRING, seq INT, level STRING, message STRING, logged_at TIMESTAMP, context STRING"),
 }
 
 
@@ -85,27 +91,41 @@ class ResultStore:
         return rows[0].asDict() if rows else None
 
     def latest_contract_version(self, contract_id: str) -> dict | None:
-        return self._one(f"SELECT * FROM {self.fqn('contract_versions')} WHERE contract_id = {sql_literal(contract_id)} "
-                         "ORDER BY first_seen_ts DESC")
+        return self._one(
+            f"SELECT * FROM {self.fqn('contract_versions')} WHERE contract_id = {sql_literal(contract_id)} "
+            "ORDER BY first_seen_ts DESC"
+        )
 
     def baseline_contract_version(self, contract_id: str) -> dict | None:
         """Last version that complied with the version-bump rule: what new changes are judged against."""
-        return self._one(f"SELECT * FROM {self.fqn('contract_versions')} WHERE contract_id = {sql_literal(contract_id)} "
-                         "AND version_ok ORDER BY first_seen_ts DESC")
+        return self._one(
+            f"SELECT * FROM {self.fqn('contract_versions')} WHERE contract_id = {sql_literal(contract_id)} "
+            "AND version_ok ORDER BY first_seen_ts DESC"
+        )
 
     def latest_quality_scores(self, max_age_hours: float) -> dict[str, float]:
-        q = (f"SELECT table_name, score FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY table_name ORDER BY run_ts DESC) rn "
-             f"FROM {self.fqn('quality_scores')} WHERE run_ts >= current_timestamp() - INTERVAL {int(max_age_hours)} HOURS) WHERE rn = 1")
+        q = (
+            "SELECT table_name, score FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY table_name ORDER BY run_ts "
+            "DESC) rn "
+            f"FROM {self.fqn('quality_scores')} WHERE run_ts >= current_timestamp() - INTERVAL {int(max_age_hours)} "
+            "HOURS) WHERE rn = 1"
+        )
         return {r["table_name"]: float(r["score"]) for r in self.spark.sql(q).collect()}
 
     def latest_access_findings(self, max_age_hours: float) -> dict[str, list[dict]]:
         """Findings from each table's most recent audit. A table whose latest audit found nothing maps to []
         so an older audit's findings can never resurface."""
-        audits = (f"SELECT table_name, run_id FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY table_name ORDER BY run_ts DESC) rn "
-                  f"FROM {self.fqn('access_audits')} WHERE run_ts >= current_timestamp() - INTERVAL {int(max_age_hours)} HOURS) WHERE rn = 1")
+        audits = (
+            "SELECT table_name, run_id FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY table_name ORDER BY run_ts "
+            "DESC) rn "
+            f"FROM {self.fqn('access_audits')} WHERE run_ts >= current_timestamp() - INTERVAL {int(max_age_hours)} "
+            "HOURS) WHERE rn = 1"
+        )
         out: dict[str, list[dict]] = {r["table_name"]: [] for r in self.spark.sql(audits).collect()}
-        q = (f"SELECT f.* FROM {self.fqn('access_findings')} f JOIN ({audits}) a "
-             "ON f.table_name = a.table_name AND f.run_id = a.run_id")
+        q = (
+            f"SELECT f.* FROM {self.fqn('access_findings')} f JOIN ({audits}) a "
+            "ON f.table_name = a.table_name AND f.run_id = a.run_id"
+        )
         for r in self.spark.sql(q).collect():
             out.setdefault(r["table_name"], []).append(r.asDict())
         return out

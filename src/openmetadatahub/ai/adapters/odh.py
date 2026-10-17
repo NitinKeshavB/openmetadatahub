@@ -19,7 +19,12 @@ from typing import Iterable
 
 import yaml
 
-from ..models import AIAsset, AssetKind, RiskClass, Stage
+from ..models import (
+    AIAsset,
+    AssetKind,
+    RiskClass,
+    Stage,
+)
 
 PREFIX = "openmetadatahub.io/"
 
@@ -58,27 +63,33 @@ def discover(manifests: str | Iterable[dict]) -> list[AIAsset]:
             continue
         meta = i.get("metadata", {})
         ns, name = meta.get("namespace", "default"), meta["name"]
-        ann = {k[len(PREFIX):]: v for k, v in (meta.get("annotations") or {}).items() if k.startswith(PREFIX)}
+        ann = {k[len(PREFIX) :]: v for k, v in (meta.get("annotations") or {}).items() if k.startswith(PREFIX)}
         governed = bool(ann)
         stage = _enum(Stage, ann.get("stage")) or (Stage.DEVELOPMENT if governed else Stage.UNAUTHORIZED)
         status_url = (i.get("status") or {}).get("url")
-        assets.append(AIAsset(
-            id=f"odh:{ns}/{name}",
-            name=name,
-            kind=AssetKind.MODEL,
-            stage=stage,
-            owner=ann.get("owner"),
-            approved_by=ann.get("approved-by"),
-            risk_class=_enum(RiskClass, ann.get("risk-class")),
-            intended_use=ann.get("intended-use"),
-            limitations=ann.get("limitations"),
-            human_oversight=ann.get("human-oversight"),
-            endpoint=status_url,
-            data_sources=_csv(ann.get("data-sources")),
-            data_contracts=_csv(ann.get("data-contracts")),
-            monitoring_enabled=ns in monitored_ns,
-            guardrails_enabled=ns in guarded_ns,
-            labels={"evaluation_tasks": ",".join(sorted(set(evaluated.get((ns, name), []))))} if (ns, name) in evaluated else {},
-            source=f"odh:{ns}/{name}",
-        ))
+        assets.append(
+            AIAsset(
+                id=f"odh:{ns}/{name}",
+                name=name,
+                kind=AssetKind.MODEL,
+                stage=stage,
+                owner=ann.get("owner"),
+                approved_by=ann.get("approved-by"),
+                risk_class=_enum(RiskClass, ann.get("risk-class")),
+                intended_use=ann.get("intended-use"),
+                limitations=ann.get("limitations"),
+                human_oversight=ann.get("human-oversight"),
+                endpoint=status_url,
+                data_sources=_csv(ann.get("data-sources")),
+                data_contracts=_csv(ann.get("data-contracts")),
+                monitoring_enabled=ns in monitored_ns,
+                guardrails_enabled=ns in guarded_ns,
+                labels=(
+                    {"evaluation_tasks": ",".join(sorted(set(evaluated.get((ns, name), []))))}
+                    if (ns, name) in evaluated
+                    else {}
+                ),
+                source=f"odh:{ns}/{name}",
+            )
+        )
     return assets
